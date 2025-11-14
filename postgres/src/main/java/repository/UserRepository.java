@@ -1,0 +1,8 @@
+package repository;
+
+import com.ntudp.vasyl.veselov.master.dto.User;
+import org.springframework.data.repository.CrudRepository;
+
+public interface UserRepository extends CrudRepository<User,String> {
+
+}
