@@ -1,6 +1,7 @@
 package com.ntudp.vasyl.veselov.master.repository;
 
 import com.ntudp.vasyl.veselov.master.dto.SqlUser;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,9 +9,12 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.cassandra.CassandraContainer;
+import org.testcontainers.containers.startupcheck.MinimumDurationRunningStartupCheckStrategy;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 @SpringBootTest
@@ -22,13 +26,15 @@ class UserRepositoryTest {
 
     @ServiceConnection
     @Container
-    private static final GenericContainer<?> REDIS_CONTAINER =
-            new GenericContainer<>("redis:latest").withExposedPorts(6379);
+    private static final CassandraContainer CASSANDRA_CONTAINER =
+            new CassandraContainer("cassandra:latest");
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
-        registry.add("spring.redis.host", REDIS_CONTAINER::getHost);
-        registry.add("spring.redis.port", () -> REDIS_CONTAINER.getExposedPorts().getFirst());
+        // todo add cassandra properties
+//        registry.add("spring.datasource.url", CASSANDRA_CONTAINER::getJdbcUrl);
+        registry.add("spring.datasource.username", CASSANDRA_CONTAINER::getUsername);
+        registry.add("spring.datasource.password", CASSANDRA_CONTAINER::getPassword);
     }
 
     @Test
