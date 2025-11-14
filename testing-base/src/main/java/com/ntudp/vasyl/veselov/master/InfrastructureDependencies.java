@@ -11,11 +11,11 @@ import org.testcontainers.containers.startupcheck.MinimumDurationRunningStartupC
 import org.testcontainers.junit.jupiter.Container;
 
 
-public interface InfrastructureDependencies {
+public interface    InfrastructureDependencies {
 
     @ServiceConnection("postgres")
     @Container
-    PostgreSQLContainer<?> postgresContainer = new PostgreSQLContainer<>("postgres:latest")
+    PostgreSQLContainer<?> POSTGRES_CONTAINER = new PostgreSQLContainer<>("postgres:latest")
             .withExposedPorts(5432);
 
     @ServiceConnection("redis")
