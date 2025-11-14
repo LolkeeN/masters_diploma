@@ -11,7 +11,7 @@ import org.testcontainers.containers.startupcheck.MinimumDurationRunningStartupC
 import org.testcontainers.junit.jupiter.Container;
 
 
-public interface    InfrastructureDependencies {
+public interface InfrastructureDependencies {
 
     @ServiceConnection("postgres")
     @Container
