@@ -30,6 +30,7 @@
     <module>redis</module>
     <module>cassandra</module>
     <module>mongo</module>
+    <module>testing-base</module>
   </modules>
   <scm>
 		<connection/>
