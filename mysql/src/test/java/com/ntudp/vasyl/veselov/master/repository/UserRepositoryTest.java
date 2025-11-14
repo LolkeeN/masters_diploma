@@ -25,7 +25,10 @@ class UserRepositoryTest {
     @ServiceConnection
     @Container
     private static final MySQLContainer<?> MYSQL_CONTAINER =
-            new MySQLContainer<>("mysql:latest");
+            new MySQLContainer<>("mysql:8.1.0")
+                    .withDatabaseName("uzer")
+                    .withUsername("test")
+                    .withPassword("test");
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
@@ -34,6 +37,7 @@ class UserRepositoryTest {
         registry.add("spring.datasource.password", MYSQL_CONTAINER::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.MySQLDialect");
+        registry.add("spring.jpa.hibernate.default_schema", () -> "uzer");
     }
 
     @Test
