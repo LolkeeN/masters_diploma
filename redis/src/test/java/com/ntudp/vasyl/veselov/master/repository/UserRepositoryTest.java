@@ -1,6 +1,6 @@
 package com.ntudp.vasyl.veselov.master.repository;
 
-import com.ntudp.vasyl.veselov.master.dto.SqlUser;
+import com.ntudp.vasyl.veselov.master.dto.RedisUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +33,6 @@ class UserRepositoryTest {
 
     @Test
     void test() {
-        userRepository.save(new SqlUser());
+        userRepository.save(new RedisUser());
     }
 }
