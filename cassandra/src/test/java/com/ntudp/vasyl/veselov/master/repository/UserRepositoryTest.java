@@ -1,6 +1,6 @@
 package com.ntudp.vasyl.veselov.master.repository;
 
-import com.ntudp.vasyl.veselov.master.dto.SqlUser;
+import com.ntudp.vasyl.veselov.master.dto.CassandraUser;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +27,10 @@ class UserRepositoryTest {
     @ServiceConnection
     @Container
     private static final CassandraContainer CASSANDRA_CONTAINER =
-            new CassandraContainer("cassandra:latest");
+            new CassandraContainer("cassandra:latest")
+                    .withInitScript(
+                            "com/ntudp/vasyl/veselov/master/repository/init-cassandra.cql"
+                    );
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
@@ -39,6 +42,6 @@ class UserRepositoryTest {
 
     @Test
     void test() {
-        userRepository.save(new SqlUser());
+        userRepository.save(new CassandraUser());
     }
 }
