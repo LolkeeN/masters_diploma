@@ -1,9 +1,15 @@
 package com.ntudp.vasyl.veselov.master.dto;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,10 +21,16 @@ import lombok.NoArgsConstructor;
 @Data
 @Builder
 @AllArgsConstructor
-@NoArgsConstructor
 public class SqlUser extends User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    private Set<SqlUser> friends = new HashSet<>();
+
+    public SqlUser() {
+        super(new Random());
+    }
 }
