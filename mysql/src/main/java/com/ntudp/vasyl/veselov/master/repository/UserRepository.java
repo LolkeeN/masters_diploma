@@ -10,4 +10,14 @@ import org.springframework.stereotype.Repository;
 public interface UserRepository extends CrudRepository<SqlUser, String> {
 
     List<SqlUser> findAll();
+
+    SqlUser getById(String id);
+
+    SqlUser getReferenceById(String id);
+
+//    SqlUser findByUsername(String username);
+//
+//    SqlUser findByEmail(String email);
+//
+//    SqlUser findByFriendsId(String friendsId);
 }

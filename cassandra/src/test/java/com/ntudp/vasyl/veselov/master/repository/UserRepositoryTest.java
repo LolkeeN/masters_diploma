@@ -87,6 +87,8 @@ class UserRepositoryTest {
         log.info("Users with friends:{}", userRepository.findAll().stream()
                 .filter(user -> user.getFriends() != null && !user.getFriends().isEmpty())
                 .count());
+
+
     }
 
 }
