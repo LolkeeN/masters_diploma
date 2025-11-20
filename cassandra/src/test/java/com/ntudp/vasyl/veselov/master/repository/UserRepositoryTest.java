@@ -2,10 +2,12 @@ package com.ntudp.vasyl.veselov.master.repository;
 
 import com.ntudp.vasyl.veselov.master.dto.CassandraUser;
 import com.ntudp.vasyl.veselov.master.dto.FriendInfo;
+import com.ntudp.vasyl.veselov.master.util.CsvUtil;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Data;
@@ -52,10 +54,16 @@ class UserRepositoryTest {
         Random rand = new Random();
         List<CassandraUser> users = new ArrayList<>();
         AtomicInteger atomicInteger = new AtomicInteger();
+        List<String[]> dataLines = new ArrayList<>();
+        dataLines.add(new String[] {
+                "Operation", "Time (ms)"
+        });
+
+        long start = System.currentTimeMillis();
         Executors.newFixedThreadPool(15).execute(() -> {
             while (true) {
                 int i = atomicInteger.incrementAndGet();
-                if ((i > 5000)) {
+                if ((i > 100)) {
                     synchronized (monitor) {
                         monitor.notify();
                     }
@@ -65,14 +73,9 @@ class UserRepositoryTest {
                 log.info("User created: {}", i);
                 CassandraUser user = new CassandraUser();
 
-
                 if (users.size() > 2) {
-                    if (user.getFriends() == null) {
-                        user.setFriends(new HashSet<>());
-                    }
-                    user.getFriends().add(new FriendInfo(users.get(rand.nextInt(users.size() - 1))));
-                } else {
-                    user.setFriends(new HashSet<>());
+                    CassandraUser friendUser = users.get(rand.nextInt(users.size() - 1));
+                    user.getFriends().add(new FriendInfo(friendUser));
                 }
 
                 users.add(userRepository.save(user));
@@ -83,12 +86,51 @@ class UserRepositoryTest {
             monitor.wait();
         }
 
-        log.info("All users created. Total: {}", userRepository.findAll().size());
-        log.info("Users with friends:{}", userRepository.findAll().stream()
-                .filter(user -> user.getFriends() != null && !user.getFriends().isEmpty())
-                .count());
+        dataLines.add(new String[] {
+                "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
+        });
 
+        start = System.currentTimeMillis();
+        userRepository.findAll()
+                .stream()
+                .filter(u -> u.getFriends() != null && u.getFriends().size() > 1)
+                .count();
 
+        dataLines.add(new String[] {
+                "Find all and interact with many to many relation", String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        start = System.currentTimeMillis();
+        String randomUserId = users.get(rand.nextInt(users.size() - 1)).getId();
+        userRepository.findById(randomUserId); // Явно используем String ID
+        dataLines.add(new String[] {
+                "Find by id", String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        start = System.currentTimeMillis();
+        CassandraUser randomUser = users.get(rand.nextInt(users.size() - 1));
+        userRepository.deleteById(randomUser.getId());
+        dataLines.add(new String[] {
+                "Delete by id", String.valueOf(System.currentTimeMillis() - start)
+        });
+        users.remove(randomUser);
+
+        start = System.currentTimeMillis();
+        userRepository.count();
+        dataLines.add(new String[] {
+                "Count all", String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        start = System.currentTimeMillis();
+        randomUser = users.get(rand.nextInt(users.size() - 1));
+        randomUser.setEmail(UUID.randomUUID().toString());
+        userRepository.save(randomUser);
+        dataLines.add(new String[] {
+                "Update user", String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        CsvUtil.generateFile("cassandra_statistics", dataLines);
     }
+
 
 }

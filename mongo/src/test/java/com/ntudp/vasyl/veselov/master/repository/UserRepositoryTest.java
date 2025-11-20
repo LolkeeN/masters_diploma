@@ -134,4 +134,5 @@ class UserRepositoryTest {
 //        });
 
         CsvUtil.generateFile("mongo_statistics", dataLines);
-    }}
+    }
+}

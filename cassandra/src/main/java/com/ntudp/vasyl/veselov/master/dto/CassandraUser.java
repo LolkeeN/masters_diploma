@@ -19,11 +19,7 @@ import org.springframework.data.cassandra.core.mapping.Table;
 @Table("user")
 public class CassandraUser extends User {
 
-    @PrimaryKeyColumn(
-            name = "id",
-            ordinal = 0,
-            type = PrimaryKeyType.PARTITIONED
-    )
+    @Id
     private String id = UUID.randomUUID().toString();
 
     // Хранение коллекции объектов (FROZEN)
