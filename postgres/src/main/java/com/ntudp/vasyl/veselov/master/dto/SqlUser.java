@@ -1,5 +1,6 @@
 package com.ntudp.vasyl.veselov.master.dto;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -27,7 +28,7 @@ public class SqlUser extends User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.REFRESH})
     private Set<SqlUser> friends = new HashSet<>();
 
     public SqlUser() {
