@@ -48,8 +48,8 @@ class UserRepositoryTest {
     private static final GenericContainer<?> REDIS_CONTAINER =
             new GenericContainer<>("redis:latest")
                     .withExposedPorts(6379)
-                    .withSharedMemorySize(2_000_000_000L)  // 2GB
-                    .withCommand("redis-server", "--maxmemory", "1gb", "--maxmemory-policy", "allkeys-lru")
+                    .withSharedMemorySize(6_000_000_000L)
+                    .withCommand("redis-server", "--maxmemory", "6gb", "--maxmemory-policy", "allkeys-lru")
             ;
 
     @DynamicPropertySource
@@ -186,12 +186,29 @@ class UserRepositoryTest {
         dataLines.add(new String[]{
                 "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
+        users = userRepository.findAll();
+
+        int fifteenPercent = (usersCount * 15) / 100;
+        Set<RedisUser> fifteenPercentUsers = users.stream()
+                .limit(fifteenPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        fifteenPercentUsers
+                .stream()
+                .flatMap(user -> user.getFriends().stream())
+                .map(RedisUser::getId)
+                .forEach(userRepository::deleteById);
+        dataLines.add(new String[]{
+                "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
+        });
 
         start = System.currentTimeMillis();
         userRepository.deleteAll();
         dataLines.add(new String[]{
                 "Delete all users", String.valueOf(System.currentTimeMillis() - start)
         });
+
 
         CsvUtil.generateFile(usersCount + "_users_redis_statistics", dataLines);
     }

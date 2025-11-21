@@ -48,12 +48,12 @@ class UserRepositoryTest {
     @Container
     private static final MongoDBContainer MONGO_CONTAINER =
             new MongoDBContainer("mongo:latest")
-                    .withCommand("mongod", "--wiredTigerCacheSizeGB", "2")  // 2GB cache
+                    .withSharedMemorySize(6_000_000_000L)
             ;
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.mongodb.uri", () -> MONGO_CONTAINER.getConnectionString() + "?connectTimeoutMS=30000&socketTimeoutMS=300000&serverSelectionTimeoutMS=30000&maxPoolSize=50");
+        registry.add("spring.data.mongodb.uri", MONGO_CONTAINER::getConnectionString);
         registry.add("spring.data.mongodb.database", () -> "test");
     }
 
@@ -184,6 +184,22 @@ class UserRepositoryTest {
         userRepository.saveAll(updated50Percent);
         dataLines.add(new String[] {
                 "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
+        });
+        users = userRepository.findAll();
+
+        int fifteenPercent = (usersCount * 15) / 100;
+        Set<MongoUser> fifteenPercentUsers = users.stream()
+                .limit(fifteenPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        fifteenPercentUsers
+                .stream()
+                .flatMap(user -> user.getFriends().stream())
+                .map(MongoUser::getId)
+                .forEach(userRepository::deleteById);
+        dataLines.add(new String[]{
+                "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
         start = System.currentTimeMillis();

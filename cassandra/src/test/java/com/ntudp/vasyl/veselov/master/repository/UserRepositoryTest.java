@@ -54,9 +54,6 @@ class UserRepositoryTest {
                             "com/ntudp/vasyl/veselov/master/repository/init-cassandra.cql"
                     )
                     .withSharedMemorySize(6_000_000_000L)
-                    .withEnv("MAX_HEAP_SIZE", "2G")
-                    .withEnv("HEAP_NEWSIZE", "400M")
-                    .withEnv("JVM_OPTS", "-Xms2G -Xmx2G")
             ;
 
     @DynamicPropertySource
@@ -191,6 +188,25 @@ class UserRepositoryTest {
         userRepository.saveAll(updated50Percent);
         dataLines.add(new String[] {
                 "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
+        });
+        users = userRepository.findAll();
+
+        int fifteenPercent = (usersCount * 15) / 100;
+        Set<CassandraUser> fifteenPercentUsers = users.stream()
+                .limit(fifteenPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        List<String> idsToDelete = fifteenPercentUsers.stream()
+                .map(CassandraUser::getId)
+                .collect(Collectors.toList());
+        fifteenPercentUsers
+                .stream()
+                .flatMap(user -> user.getFriends().stream().map(FriendInfo::getId))
+                .forEach(idsToDelete::add);
+        idsToDelete.forEach(userRepository::deleteById);
+        dataLines.add(new String[]{
+                "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
         start = System.currentTimeMillis();

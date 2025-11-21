@@ -54,10 +54,7 @@ class UserRepositoryTest {
             new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
                     .acceptLicense()
                     .withPassword("yourStrong(!)Password")
-                    .withEnv("MSSQL_AGENT_ENABLED", "true")
-                    .withSharedMemorySize(4_000_000_000L)  // 4GB
-                    .withEnv("MSSQL_MEMORY_LIMIT_MB", "4096")
-                    .withStartupCheckStrategy(new MinimumDurationRunningStartupCheckStrategy(Duration.ofSeconds(5)))
+                    .withSharedMemorySize(6_000_000_000L)  // 4GB
                     .withReuse(true);
 
     @DynamicPropertySource
@@ -160,7 +157,7 @@ class UserRepositoryTest {
                 .collect(Collectors.toSet());
 
         start = System.currentTimeMillis();
-        userRepository.findAllById(tenPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
+        findAllByIdsFast(tenPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
 
         dataLines.add(new String[] {
                 "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
@@ -182,7 +179,7 @@ class UserRepositoryTest {
                 .collect(Collectors.toSet());
 
         start = System.currentTimeMillis();
-        userRepository.findAllById(fiftyPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
+        findAllByIdsFast(fiftyPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
 
         dataLines.add(new String[] {
                 "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
@@ -195,6 +192,21 @@ class UserRepositoryTest {
         userRepository.saveAll(updated50Percent);
         dataLines.add(new String[] {
                 "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
+        });
+        users = userRepository.findAll();
+
+        int fifteenPercent = (usersCount * 15) / 100;
+        Set<SqlUser> fifteenPercentUsers = users.stream()
+                .limit(fifteenPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        fifteenPercentUsers
+                .stream()
+                .map(SqlUser::getId)
+                .forEach(userRepository::deleteUserWithFriendships);
+        dataLines.add(new String[]{
+                "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
         start = System.currentTimeMillis();
@@ -223,5 +235,9 @@ class UserRepositoryTest {
     private SqlUser updateAddress(SqlUser user) {
         user.setAddress(UUID.randomUUID().toString());
         return user;
+    }
+    private List<SqlUser> findAllByIdsFast(List<String> ids) {
+        String idsString = String.join(",", ids);
+        return userRepository.findAllByIdsString(idsString);
     }
 }

@@ -50,8 +50,7 @@ class UserRepositoryTest {
     private static final PostgreSQLContainer<?> POSTGRES_CONTAINER = new PostgreSQLContainer<>("postgres:latest")
             .withUsername("postgres")
             .withPassword("postgres")
-            .withSharedMemorySize(4_000_000_000L)  // 4GB
-            .withEnv("MSSQL_MEMORY_LIMIT_MB", "4096")
+            .withSharedMemorySize(6_000_000_000L)
             ;
 
     @DynamicPropertySource
@@ -190,6 +189,21 @@ class UserRepositoryTest {
         userRepository.saveAll(updated50Percent);
         dataLines.add(new String[] {
                 "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
+        });
+        users = userRepository.findAll();
+
+        int fifteenPercent = (usersCount * 15) / 100;
+        Set<SqlUser> fifteenPercentUsers = users.stream()
+                .limit(fifteenPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        fifteenPercentUsers
+                .stream()
+                .map(SqlUser::getId)
+                .forEach(userRepository::deleteUserWithFriendships);
+        dataLines.add(new String[]{
+                "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
         start = System.currentTimeMillis();
