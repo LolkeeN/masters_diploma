@@ -13,11 +13,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.TestPropertySources;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -25,12 +27,18 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Slf4j
 @Testcontainers
 @SpringBootTest
-@TestPropertySource("classpath:application-test.properties")
+@TestPropertySources({
+        @TestPropertySource("classpath:application-test.properties"),
+        @TestPropertySource("classpath:test-common.properties")
+})
 class UserRepositoryTest {
 
     private final Object monitor = new Object();
     @Autowired
     private UserRepository userRepository;
+
+    @Value("${test.users.count}")
+    private int usersCount;
 
     @ServiceConnection
     @Container
@@ -107,9 +115,7 @@ class UserRepositoryTest {
 
         start = System.currentTimeMillis();
         SqlUser randomUser = users.get(rand.nextInt(users.size() - 1));
-        randomUser.getFriends().clear();
-        userRepository.save(randomUser);
-        userRepository.delete(randomUser);
+        userRepository.deleteUserWithFriendships(randomUser.getId());
         dataLines.add(new String[] {
                 "Delete by id", String.valueOf(System.currentTimeMillis() - start)
         });

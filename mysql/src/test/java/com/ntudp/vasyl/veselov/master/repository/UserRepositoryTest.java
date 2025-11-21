@@ -1,21 +1,27 @@
 package com.ntudp.vasyl.veselov.master.repository;
 
 import com.ntudp.vasyl.veselov.master.dto.SqlUser;
+import com.ntudp.vasyl.veselov.master.dto.User;
 import com.ntudp.vasyl.veselov.master.util.CsvUtil;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.TestPropertySources;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -25,12 +31,18 @@ import static org.junit.jupiter.api.Assertions.*;
 @Slf4j
 @Testcontainers
 @SpringBootTest
-@TestPropertySource("classpath:application-test.properties")
+@TestPropertySources({
+        @TestPropertySource("classpath:application-test.properties"),
+        @TestPropertySource("classpath:test-common.properties")
+})
 class UserRepositoryTest {
 
     private final Object monitor = new Object();
     @Autowired
     private UserRepository userRepository;
+
+    @Value("${test.users.count}")
+    private int usersCount;
 
     @ServiceConnection
     @Container
@@ -64,7 +76,7 @@ class UserRepositoryTest {
         Executors.newFixedThreadPool(15).execute(() -> {
             while (true) {
                 int i = atomicInteger.incrementAndGet();
-                if ((i > 5000)) {
+                if ((i > usersCount)) {
                     synchronized (monitor) {
                         monitor.notify();
                     }
@@ -87,11 +99,13 @@ class UserRepositoryTest {
             monitor.wait();
         }
 
+        Set<String> usedIds = new HashSet<>();
         dataLines.add(new String[] {
                 "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
         });
 
 
+        SqlUser randomUser = users.get(rand.nextInt(users.size() - 1));
         start = System.currentTimeMillis();
         userRepository.findAll()
                 .stream()
@@ -103,18 +117,20 @@ class UserRepositoryTest {
         });
 
         start = System.currentTimeMillis();
-        userRepository.findById(users.get(rand.nextInt(users.size() - 1)).getId());
+        userRepository.findById(randomUser.getId());
         dataLines.add(new String[] {
                 "Find by id", String.valueOf(System.currentTimeMillis() - start)
         });
+        usedIds.add(randomUser.getId());
 
+        randomUser = users.get(rand.nextInt(users.size() - 1));
         start = System.currentTimeMillis();
-        SqlUser randomUser = users.get(rand.nextInt(users.size() - 1));
-        userRepository.delete(randomUser);
+        userRepository.deleteUserWithFriendships(randomUser.getId());
         dataLines.add(new String[] {
                 "Delete by id", String.valueOf(System.currentTimeMillis() - start)
         });
         users.remove(randomUser);
+        usedIds.add(randomUser.getId());
 
         start = System.currentTimeMillis();
         userRepository.count();
@@ -128,6 +144,59 @@ class UserRepositoryTest {
         userRepository.save(randomUser);
         dataLines.add(new String[] {
                 "Update user", String.valueOf(System.currentTimeMillis() - start)
+        });
+        usedIds.add(randomUser.getId());
+
+        int tenPercent = usersCount / 10;
+        Set<SqlUser> tenPercentUsers = users.stream()
+                .filter(user -> !usedIds.contains(user.getId()))
+                .limit(tenPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        userRepository.findAllById(tenPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
+
+        dataLines.add(new String[] {
+                "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        List<SqlUser> updatedTenPercent = tenPercentUsers.stream()
+                .peek(this::updateEmail)
+                .toList();
+        start = System.currentTimeMillis();
+        userRepository.saveAll(updatedTenPercent);
+        dataLines.add(new String[] {
+                "Update email for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
+        });
+        usedIds.addAll(tenPercentUsers.stream().map(SqlUser::getId).toList());
+
+        int fiftyPercent = usersCount / 2;
+        Set<SqlUser> fiftyPercentUsers = users.stream()
+                .filter(user -> !usedIds.contains(user.getId()))
+                .limit(tenPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        userRepository.findAllById(fiftyPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
+
+        dataLines.add(new String[] {
+                "Find %s(10 percent) random users".formatted(fiftyPercentUsers), String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        List<SqlUser> updated50Percent = fiftyPercentUsers.stream()
+                .peek(this::updateEmail)
+                .toList();
+        start = System.currentTimeMillis();
+        userRepository.saveAll(updated50Percent);
+        dataLines.add(new String[] {
+                "Update email for %s(50 percent) random users".formatted(fiftyPercent), String.valueOf(System.currentTimeMillis() - start)
+        });
+        usedIds.addAll(fiftyPercentUsers.stream().map(SqlUser::getId).toList());
+
+        start = System.currentTimeMillis();
+        userRepository.deleteAll();
+        dataLines.add(new String[] {
+                "Delete all users", String.valueOf(System.currentTimeMillis() - start)
         });
 //
 //        start = System.currentTimeMillis();
@@ -143,6 +212,11 @@ class UserRepositoryTest {
 //        });
 
         CsvUtil.generateFile("mysql_statistics", dataLines);
+    }
+
+    private User updateEmail(SqlUser user) {
+        user.setAddress(UUID.randomUUID().toString());
+        return user;
     }
 
 }

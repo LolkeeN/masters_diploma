@@ -2,7 +2,10 @@ package com.ntudp.vasyl.veselov.master.repository;
 
 import com.ntudp.vasyl.veselov.master.dto.SqlUser;
 import com.ntudp.vasyl.veselov.master.dto.User;
+import jakarta.transaction.Transactional;
 import java.util.List;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,9 +14,16 @@ public interface UserRepository extends CrudRepository<SqlUser, String> {
 
     List<SqlUser> findAll();
 
-    SqlUser getById(String id);
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM uzer_friends WHERE uzer_id = ?1 OR friends_id = ?1", nativeQuery = true)
+    void deleteAllFriendshipsByUserId(String userId);
 
-    SqlUser getReferenceById(String id);
+    @Transactional
+    default void deleteUserWithFriendships(String userId) {
+        deleteAllFriendshipsByUserId(userId);
+        deleteById(userId);
+    }
 
 //    SqlUser findByUsername(String username);
 //
