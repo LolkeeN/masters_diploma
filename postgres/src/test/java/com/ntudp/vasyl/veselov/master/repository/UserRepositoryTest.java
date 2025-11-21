@@ -49,7 +49,10 @@ class UserRepositoryTest {
     @Container
     private static final PostgreSQLContainer<?> POSTGRES_CONTAINER = new PostgreSQLContainer<>("postgres:latest")
             .withUsername("postgres")
-            .withPassword("postgres");
+            .withPassword("postgres")
+            .withSharedMemorySize(4_000_000_000L)  // 4GB
+            .withEnv("MSSQL_MEMORY_LIMIT_MB", "4096")
+            ;
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {

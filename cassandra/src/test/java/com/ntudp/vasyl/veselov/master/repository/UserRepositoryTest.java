@@ -52,7 +52,12 @@ class UserRepositoryTest {
             new CassandraContainer("cassandra:latest")
                     .withInitScript(
                             "com/ntudp/vasyl/veselov/master/repository/init-cassandra.cql"
-                    );
+                    )
+                    .withSharedMemorySize(6_000_000_000L)
+                    .withEnv("MAX_HEAP_SIZE", "2G")
+                    .withEnv("HEAP_NEWSIZE", "400M")
+                    .withEnv("JVM_OPTS", "-Xms2G -Xmx2G")
+            ;
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {

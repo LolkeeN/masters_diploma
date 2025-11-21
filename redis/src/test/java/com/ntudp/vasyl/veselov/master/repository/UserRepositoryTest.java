@@ -46,7 +46,11 @@ class UserRepositoryTest {
     @ServiceConnection
     @Container
     private static final GenericContainer<?> REDIS_CONTAINER =
-            new GenericContainer<>("redis:latest").withExposedPorts(6379);
+            new GenericContainer<>("redis:latest")
+                    .withExposedPorts(6379)
+                    .withSharedMemorySize(2_000_000_000L)  // 2GB
+                    .withCommand("redis-server", "--maxmemory", "1gb", "--maxmemory-policy", "allkeys-lru")
+            ;
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {

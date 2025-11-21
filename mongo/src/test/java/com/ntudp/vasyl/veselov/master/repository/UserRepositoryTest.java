@@ -47,7 +47,9 @@ class UserRepositoryTest {
     @ServiceConnection
     @Container
     private static final MongoDBContainer MONGO_CONTAINER =
-            new MongoDBContainer("mongo:latest");
+            new MongoDBContainer("mongo:latest")
+                    .withCommand("mongod", "--wiredTigerCacheSizeGB", "2")  // 2GB cache
+            ;
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {

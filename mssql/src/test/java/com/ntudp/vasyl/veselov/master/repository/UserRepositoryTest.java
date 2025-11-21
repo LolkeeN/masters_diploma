@@ -55,6 +55,8 @@ class UserRepositoryTest {
                     .acceptLicense()
                     .withPassword("yourStrong(!)Password")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
+                    .withSharedMemorySize(4_000_000_000L)  // 4GB
+                    .withEnv("MSSQL_MEMORY_LIMIT_MB", "4096")
                     .withStartupCheckStrategy(new MinimumDurationRunningStartupCheckStrategy(Duration.ofSeconds(5)))
                     .withReuse(true);
 

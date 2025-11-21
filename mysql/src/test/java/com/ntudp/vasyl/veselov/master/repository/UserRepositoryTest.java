@@ -51,7 +51,10 @@ class UserRepositoryTest {
             new MySQLContainer<>("mysql:8.1.0")
                     .withDatabaseName("uzer")
                     .withUsername("test")
-                    .withPassword("test");
+                    .withPassword("test")
+                    .withSharedMemorySize(4_000_000_000L)  // 4GB
+                    .withEnv("MSSQL_MEMORY_LIMIT_MB", "4096")
+            ;
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
