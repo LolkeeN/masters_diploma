@@ -22,11 +22,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.TestPropertySources;
+import org.springframework.test.context.jdbc.Sql;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @Slf4j
 @Testcontainers
@@ -68,11 +67,13 @@ class UserRepositoryTest {
         List<SqlUser> users = new ArrayList<>();
         AtomicInteger atomicInteger = new AtomicInteger();
         List<String[]> dataLines = new ArrayList<>();
+        Set<String> usedIds = new HashSet<>();
         dataLines.add(new String[] {
                 "Operation", "Time (ms)"
         });
 
         long start = System.currentTimeMillis();
+        List<SqlUser> finalUsers = users;
         Executors.newFixedThreadPool(15).execute(() -> {
             while (true) {
                 int i = atomicInteger.incrementAndGet();
@@ -87,11 +88,11 @@ class UserRepositoryTest {
                 SqlUser user = new SqlUser();
 
 
-                if (users.size() > 2) {
-                    user.getFriends().add(users.get(rand.nextInt(users.size() - 1)));
+                if (finalUsers.size() > 2) {
+                    user.getFriends().add(finalUsers.get(rand.nextInt(finalUsers.size() - 1)));
                 }
 
-                users.add(userRepository.save(user));
+                finalUsers.add(userRepository.save(user));
             }
         });
 
@@ -99,13 +100,13 @@ class UserRepositoryTest {
             monitor.wait();
         }
 
-        Set<String> usedIds = new HashSet<>();
         dataLines.add(new String[] {
                 "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
         });
 
 
         SqlUser randomUser = users.get(rand.nextInt(users.size() - 1));
+
         start = System.currentTimeMillis();
         userRepository.findAll()
                 .stream()
@@ -121,16 +122,15 @@ class UserRepositoryTest {
         dataLines.add(new String[] {
                 "Find by id", String.valueOf(System.currentTimeMillis() - start)
         });
-        usedIds.add(randomUser.getId());
+        users = userRepository.findAll();
 
         randomUser = users.get(rand.nextInt(users.size() - 1));
         start = System.currentTimeMillis();
         userRepository.deleteUserWithFriendships(randomUser.getId());
         dataLines.add(new String[] {
-                "Delete by id", String.valueOf(System.currentTimeMillis() - start)
+                "Delete by id with all friendships", String.valueOf(System.currentTimeMillis() - start)
         });
-        users.remove(randomUser);
-        usedIds.add(randomUser.getId());
+        users = userRepository.findAll();
 
         start = System.currentTimeMillis();
         userRepository.count();
@@ -145,11 +145,10 @@ class UserRepositoryTest {
         dataLines.add(new String[] {
                 "Update user", String.valueOf(System.currentTimeMillis() - start)
         });
-        usedIds.add(randomUser.getId());
+        users = userRepository.findAll();
 
         int tenPercent = usersCount / 10;
         Set<SqlUser> tenPercentUsers = users.stream()
-                .filter(user -> !usedIds.contains(user.getId()))
                 .limit(tenPercent)
                 .collect(Collectors.toSet());
 
@@ -161,60 +160,60 @@ class UserRepositoryTest {
         });
 
         List<SqlUser> updatedTenPercent = tenPercentUsers.stream()
-                .peek(this::updateEmail)
+                .map(this::updateAddress)
                 .toList();
         start = System.currentTimeMillis();
         userRepository.saveAll(updatedTenPercent);
         dataLines.add(new String[] {
-                "Update email for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
+                "Update address for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
-        usedIds.addAll(tenPercentUsers.stream().map(SqlUser::getId).toList());
+        users = userRepository.findAll();
 
         int fiftyPercent = usersCount / 2;
         Set<SqlUser> fiftyPercentUsers = users.stream()
-                .filter(user -> !usedIds.contains(user.getId()))
-                .limit(tenPercent)
+                .limit(fiftyPercent)
                 .collect(Collectors.toSet());
 
         start = System.currentTimeMillis();
         userRepository.findAllById(fiftyPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
 
         dataLines.add(new String[] {
-                "Find %s(10 percent) random users".formatted(fiftyPercentUsers), String.valueOf(System.currentTimeMillis() - start)
+                "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
         List<SqlUser> updated50Percent = fiftyPercentUsers.stream()
-                .peek(this::updateEmail)
+                .map(this::updateAddress)
                 .toList();
         start = System.currentTimeMillis();
         userRepository.saveAll(updated50Percent);
         dataLines.add(new String[] {
-                "Update email for %s(50 percent) random users".formatted(fiftyPercent), String.valueOf(System.currentTimeMillis() - start)
+                "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
-        usedIds.addAll(fiftyPercentUsers.stream().map(SqlUser::getId).toList());
 
         start = System.currentTimeMillis();
         userRepository.deleteAll();
         dataLines.add(new String[] {
                 "Delete all users", String.valueOf(System.currentTimeMillis() - start)
         });
-//
-//        start = System.currentTimeMillis();
-//        userRepository.findByEmail(randomUser.getEmail());
-//        dataLines.add(new String[] {
-//                "Find by email", String.valueOf(System.currentTimeMillis() - start)
-//        });
-//
-//        start = System.currentTimeMillis();
-//        userRepository.findByFriendsId(randomUser.getId());
-//        dataLines.add(new String[] {
-//                "Find by friends id", String.valueOf(System.currentTimeMillis() - start)
-//        });
 
         CsvUtil.generateFile("mysql_statistics", dataLines);
     }
 
-    private User updateEmail(SqlUser user) {
+    private static void setUsedForUserAndHisFriends(Set<String> usedIds, Set<SqlUser> setOfUsers) {
+        usedIds.addAll(setOfUsers.stream().map(SqlUser::getId).toList());
+        usedIds.addAll(setOfUsers.stream()
+                .flatMap(x -> x.getFriends().stream().map(SqlUser::getId))
+                .toList());
+    }
+
+    private static void setUsedForUserAndHisFriends(Set<String> usedIds, SqlUser user) {
+        usedIds.add(user.getId());
+        usedIds.addAll(user.getFriends().stream()
+                .flatMap(x -> x.getFriends().stream().map(SqlUser::getId))
+                .toList());
+    }
+
+    private SqlUser updateAddress(SqlUser user) {
         user.setAddress(UUID.randomUUID().toString());
         return user;
     }

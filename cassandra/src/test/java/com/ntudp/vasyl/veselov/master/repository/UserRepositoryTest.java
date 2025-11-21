@@ -7,9 +7,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
@@ -64,15 +66,17 @@ class UserRepositoryTest {
         List<CassandraUser> users = new ArrayList<>();
         AtomicInteger atomicInteger = new AtomicInteger();
         List<String[]> dataLines = new ArrayList<>();
+        Set<String> usedIds = new HashSet<>();
         dataLines.add(new String[] {
                 "Operation", "Time (ms)"
         });
 
         long start = System.currentTimeMillis();
+        List<CassandraUser> finalUsers = users;
         Executors.newFixedThreadPool(15).execute(() -> {
             while (true) {
                 int i = atomicInteger.incrementAndGet();
-                if ((i > 100)) {
+                if ((i > usersCount)) {
                     synchronized (monitor) {
                         monitor.notify();
                     }
@@ -82,12 +86,12 @@ class UserRepositoryTest {
                 log.info("User created: {}", i);
                 CassandraUser user = new CassandraUser();
 
-                if (users.size() > 2) {
-                    CassandraUser friendUser = users.get(rand.nextInt(users.size() - 1));
+                if (finalUsers.size() > 2) {
+                    CassandraUser friendUser = finalUsers.get(rand.nextInt(finalUsers.size() - 1));
                     user.getFriends().add(new FriendInfo(friendUser));
                 }
 
-                users.add(userRepository.save(user));
+                finalUsers.add(userRepository.save(user));
             }
         });
 
@@ -95,6 +99,7 @@ class UserRepositoryTest {
             monitor.wait();
         }
 
+        CassandraUser randomUser = users.get(rand.nextInt(users.size() - 1));
         dataLines.add(new String[] {
                 "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
         });
@@ -110,19 +115,17 @@ class UserRepositoryTest {
         });
 
         start = System.currentTimeMillis();
-        String randomUserId = users.get(rand.nextInt(users.size() - 1)).getId();
-        userRepository.findById(randomUserId); // Явно используем String ID
+        userRepository.findById(randomUser.getId()); // Явно используем String ID
         dataLines.add(new String[] {
                 "Find by id", String.valueOf(System.currentTimeMillis() - start)
         });
 
         start = System.currentTimeMillis();
-        CassandraUser randomUser = users.get(rand.nextInt(users.size() - 1));
         userRepository.deleteById(randomUser.getId());
         dataLines.add(new String[] {
                 "Delete by id", String.valueOf(System.currentTimeMillis() - start)
         });
-        users.remove(randomUser);
+        users = userRepository.findAll();
 
         start = System.currentTimeMillis();
         userRepository.count();
@@ -137,9 +140,63 @@ class UserRepositoryTest {
         dataLines.add(new String[] {
                 "Update user", String.valueOf(System.currentTimeMillis() - start)
         });
+        users = userRepository.findAll();
+
+        int tenPercent = usersCount / 10;
+        Set<CassandraUser> tenPercentUsers = users.stream()
+                .limit(tenPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        userRepository.findAllById(tenPercentUsers.stream().map(CassandraUser::getId).collect(Collectors.toList()));
+
+        dataLines.add(new String[] {
+                "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        List<CassandraUser> updatedTenPercent = tenPercentUsers.stream()
+                .map(this::updateAddress)
+                .toList();
+        start = System.currentTimeMillis();
+        userRepository.saveAll(updatedTenPercent);
+        dataLines.add(new String[] {
+                "Update address for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
+        });
+        users = userRepository.findAll();
+
+        int fiftyPercent = usersCount / 2;
+        Set<CassandraUser> fiftyPercentUsers = users.stream()
+                .limit(fiftyPercent)
+                .collect(Collectors.toSet());
+
+        start = System.currentTimeMillis();
+        userRepository.findAllById(fiftyPercentUsers.stream().map(CassandraUser::getId).collect(Collectors.toList()));
+
+        dataLines.add(new String[] {
+                "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        List<CassandraUser> updated50Percent = fiftyPercentUsers.stream()
+                .map(this::updateAddress)
+                .toList();
+        start = System.currentTimeMillis();
+        userRepository.saveAll(updated50Percent);
+        dataLines.add(new String[] {
+                "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
+        });
+
+        start = System.currentTimeMillis();
+        userRepository.deleteAll();
+        dataLines.add(new String[] {
+                "Delete all users", String.valueOf(System.currentTimeMillis() - start)
+        });
 
         CsvUtil.generateFile("cassandra_statistics", dataLines);
     }
 
 
+    private CassandraUser updateAddress(CassandraUser user) {
+        user.setAddress(UUID.randomUUID().toString());
+        return user;
+    }
 }
