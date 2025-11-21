@@ -123,7 +123,7 @@ class UserRepositoryTest {
         start = System.currentTimeMillis();
         userRepository.deleteById(randomUser.getId());
         dataLines.add(new String[] {
-                "Delete by id", String.valueOf(System.currentTimeMillis() - start)
+                "Delete by id with all friendships", String.valueOf(System.currentTimeMillis() - start)
         });
         users = userRepository.findAll();
 
