@@ -11,10 +11,12 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,6 +61,7 @@ class UserRepositoryTest {
     }
 
     @Test
+    @Timeout(value = 30, unit = TimeUnit.MINUTES)
     void test() throws Exception {
         Random rand = new Random();
         List<SqlUser> users = new ArrayList<>();
@@ -192,7 +195,7 @@ class UserRepositoryTest {
                 "Delete all users", String.valueOf(System.currentTimeMillis() - start)
         });
 
-        CsvUtil.generateFile("postgres_statistics", dataLines);
+        CsvUtil.generateFile(usersCount + "_users_postgres_statistics", dataLines);
     }
 
     private static void setUsedForUserAndHisFriends(Set<String> usedIds, Set<SqlUser> setOfUsers) {

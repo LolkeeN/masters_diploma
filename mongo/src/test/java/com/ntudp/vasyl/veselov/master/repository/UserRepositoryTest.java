@@ -9,10 +9,12 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,11 +51,12 @@ class UserRepositoryTest {
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.mongodb.uri", MONGO_CONTAINER::getConnectionString);
+        registry.add("spring.data.mongodb.uri", () -> MONGO_CONTAINER.getConnectionString() + "?connectTimeoutMS=30000&socketTimeoutMS=300000&serverSelectionTimeoutMS=30000&maxPoolSize=50");
         registry.add("spring.data.mongodb.database", () -> "test");
     }
 
     @Test
+    @Timeout(value = 30, unit = TimeUnit.MINUTES)
     void test() throws Exception {
         Random rand = new Random();
         List<MongoUser> users = new ArrayList<>();
@@ -187,7 +190,7 @@ class UserRepositoryTest {
                 "Delete all users", String.valueOf(System.currentTimeMillis() - start)
         });
 
-        CsvUtil.generateFile("mongo_statistics", dataLines);
+        CsvUtil.generateFile(usersCount + "_users_mongo_statistics", dataLines);
     }
 
 
