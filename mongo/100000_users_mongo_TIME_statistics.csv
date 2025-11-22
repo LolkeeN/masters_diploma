@@ -1,0 +1,13 @@
+Operation,Time (ms)
+Generate starting users,746325
+Find all and interact with many to many relation,1419
+Find by id,5
+Delete by id with all friendships,26
+Count all,24
+Update user,19
+Find 10000(10 percent) random users,146
+Update address for 10000(10 percent) random users,32678
+Find 50000(10 percent) random users,748
+Update address for 50000(50 percent) random users,141109
+Delete users with friends for 15000(15 percent) random users,95782
+Delete all users,878

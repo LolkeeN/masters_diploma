@@ -60,9 +60,7 @@ class UserRepositoryTest {
                     .withCommand("postgres",
                             "-c", "shared_buffers=2GB",        // Основной кеш
                             "-c", "effective_cache_size=6GB",  // Доступная память
-                            "-c", "work_mem=128MB",            // Упростить
-                            "-c", "fsync=off",                 // Отключить для честности
-                            "-c", "synchronous_commit=off"    // Отключить для честности
+                            "-c", "work_mem=128MB"            // Упростить
                     );
 
     @DynamicPropertySource

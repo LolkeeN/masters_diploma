@@ -59,13 +59,14 @@ class UserRepositoryTest {
                     .withPassword("test")
                     .withSharedMemorySize(8_000_000_000L)
                     .withCommand("mysqld",
-                            "--innodb-buffer-pool-size=2G",          // ← Убрать конфликт
-                            "--innodb-flush-log-at-trx-commit=0",    // Отключить персистентность
-                            "--sync-binlog=0",                       // Отключить персистентность
-                            "--innodb-doublewrite=0",                // Отключить персистентность
+                            "--innodb-buffer-pool-size=2G",
+                            "--innodb-flush-log-at-trx-commit=1",
+                            "--sync-binlog=1",
+                            "--innodb-doublewrite=1",
                             "--innodb-log-file-size=512M",
                             "--max-connections=1000",
-                            "--skip-name-resolve"
+                            "--skip-name-resolve",
+                            "--max-allowed-packet=64M"
                     );
 
     @DynamicPropertySource
