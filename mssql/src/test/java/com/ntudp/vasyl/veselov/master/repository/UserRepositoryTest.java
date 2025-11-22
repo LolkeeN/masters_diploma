@@ -1,8 +1,11 @@
 package com.ntudp.vasyl.veselov.master.repository;
 
 import com.ntudp.vasyl.veselov.master.dto.SqlUser;
+import com.ntudp.vasyl.veselov.master.util.ContainerStats;
 import com.ntudp.vasyl.veselov.master.util.CsvUtil;
 import jakarta.annotation.PostConstruct;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -30,6 +33,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.TestPropertySources;
 import org.testcontainers.containers.BindMode;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.startupcheck.MinimumDurationRunningStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -72,9 +76,21 @@ class UserRepositoryTest {
         try (Connection conn = dataSource.getConnection();
                 Statement stmt = conn.createStatement()) {
 
-            stmt.execute("ALTER DATABASE CURRENT SET RECOVERY SIMPLE");         // Отключить персистентность
-            stmt.execute("EXEC sp_configure 'max server memory (MB)', 6144");   // Лимит памяти
+            stmt.execute("EXEC sp_configure 'show advanced options', 1");
             stmt.execute("RECONFIGURE");
+
+            stmt.execute("EXEC sp_configure 'max server memory (MB)', 6144");
+            stmt.execute("RECONFIGURE");
+
+            stmt.execute("ALTER DATABASE CURRENT SET RECOVERY SIMPLE");
+            stmt.execute("ALTER DATABASE CURRENT SET AUTO_CREATE_STATISTICS ON");
+            stmt.execute("ALTER DATABASE CURRENT SET AUTO_UPDATE_STATISTICS ON");
+
+            log.info("MSSQL configured successfully");
+
+        } catch (SQLException e) {
+            log.warn("MSSQL optimization failed: {}", e.getMessage());
+            // Если не работает - просто продолжаем без оптимизаций
         }
     }
 
@@ -94,7 +110,7 @@ class UserRepositoryTest {
         List<SqlUser> users = new ArrayList<>();
         AtomicInteger atomicInteger = new AtomicInteger();
         List<String[]> dataLines = new ArrayList<>();
-        Set<String> usedIds = new HashSet<>();
+        List<ContainerStats> metrics = new ArrayList<>();
         dataLines.add(new String[] {
                 "Operation", "Time (ms)"
         });
@@ -120,6 +136,16 @@ class UserRepositoryTest {
                 }
 
                 finalUsers.add(userRepository.save(user));
+            }
+        });
+        Executors.newFixedThreadPool(1).execute(() -> {
+            while (MS_SQL_CONTAINER.isRunning()) {
+                metrics.add(collectStats(MS_SQL_CONTAINER));
+                try {
+                    Thread.sleep(usersCount / 10);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         });
 
@@ -247,7 +273,34 @@ class UserRepositoryTest {
                 "Delete all users", String.valueOf(System.currentTimeMillis() - start)
         });
 
-        CsvUtil.generateFile(usersCount + "_users_mssql_statistics", dataLines);
+        MS_SQL_CONTAINER.stop();
+
+        List<String[]> metricDataLines = new ArrayList<>();
+        metricDataLines.add(new String[]{
+                "Timestamp",
+                "CPU percentage",
+                "Memory Usage bytes",
+                "Memory limit bytes",
+                "Disk read bytes",
+                "Disk write bytes",
+                "Network received bytes",
+                "Network sent bytes"
+        });
+        for (ContainerStats metric : metrics) {
+            metricDataLines.add(new String[]{
+                    String.valueOf(metric.getTimestamp()),
+                    String.valueOf(metric.getCpuPercentage()),
+                    String.valueOf(metric.getMemoryUsageBytes()),
+                    String.valueOf(metric.getMemoryLimitBytes()),
+                    String.valueOf(metric.getDiskReadBytes()),
+                    String.valueOf(metric.getDiskWriteBytes()),
+                    String.valueOf(metric.getNetworkReceivedBytes()),
+                    String.valueOf(metric.getNetworkSentBytes())
+            });
+        }
+
+        CsvUtil.generateFile(usersCount + "_users_msSQL_TIME_statistics", dataLines);
+        CsvUtil.generateFile(usersCount + "_users_msSQL_CONTAINER_statistics", metricDataLines);
     }
 
     private static void setUsedForUserAndHisFriends(Set<String> usedIds, Set<SqlUser> setOfUsers) {
@@ -271,5 +324,112 @@ class UserRepositoryTest {
     private List<SqlUser> findAllByIdsFast(List<String> ids) {
         String idsString = String.join(",", ids);
         return userRepository.findAllByIdsString(idsString);
+    }
+
+    private ContainerStats collectStats(GenericContainer<?> container) {
+        try {
+            // Используем команду docker stats напрямую
+            String containerId = container.getContainerId();
+
+            ProcessBuilder pb = new ProcessBuilder(
+                    "docker", "stats", "--no-stream", "--format",
+                    "{{.CPUPerc}},{{.MemUsage}},{{.NetIO}},{{.BlockIO}}",
+                    containerId
+            );
+
+            Process process = pb.start();
+
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()))) {
+
+                String line = reader.readLine();
+                if (line != null) {
+                    return parseDockerStatsOutput(line);
+                }
+            }
+
+            process.waitFor(5, TimeUnit.SECONDS);
+
+        } catch (Exception e) {
+            log.warn("Failed to collect stats via docker command: {}", e.getMessage());
+        }
+
+        return new ContainerStats(0, 0, 0, 0, 0, 0, 0, System.currentTimeMillis());
+    }
+
+    private ContainerStats parseDockerStatsOutput(String line) {
+        // Парсим: "100.85%,1.15GiB / 15.44GiB,256MB / 129MB,0B / 0B"
+        String[] parts = line.split(",");
+
+        double cpuPercent = parseCpuPercent(parts[0]);           // "100.85%" -> 100.85
+        long[] memory = parseMemoryUsage(parts[1]);             // "1.15GiB / 15.44GiB" -> [bytes, limit]
+        long[] network = parseNetworkIO(parts[2]);              // "256MB / 129MB" -> [rx, tx]
+        long[] disk = parseDiskIO(parts[3]);                    // "0B / 0B" -> [read, write]
+
+        return new ContainerStats(
+                cpuPercent,
+                memory[0],      // usage
+                memory[1],      // limit
+                disk[0],        // read
+                disk[1],        // write
+                network[0],     // received
+                network[1],     // sent
+                System.currentTimeMillis()
+        );
+    }
+
+    private double parseCpuPercent(String cpuStr) {
+        return Double.parseDouble(cpuStr.replace("%", ""));
+    }
+
+    private long[] parseMemoryUsage(String memStr) {
+        // "1.15GiB / 15.44GiB" -> [1235000000L, 16583000000L]
+        String[] parts = memStr.split(" / ");
+        return new long[]{
+                parseBytes(parts[0].trim()),
+                parseBytes(parts[1].trim())
+        };
+    }
+
+    private long parseBytes(String sizeStr) {
+        // "1.15GiB" -> 1235000000L
+        String numStr = sizeStr.replaceAll("[^0-9.]", "");
+        double value = Double.parseDouble(numStr);
+
+        if (sizeStr.contains("GiB") || sizeStr.contains("GB")) {
+            return (long) (value * 1_073_741_824); // 1024^3
+        } else if (sizeStr.contains("MiB") || sizeStr.contains("MB")) {
+            return (long) (value * 1_048_576); // 1024^2
+        } else if (sizeStr.contains("KiB") || sizeStr.contains("KB")) {
+            return (long) (value * 1024);
+        }
+
+        return (long) value;
+    }
+
+    private long[] parseNetworkIO(String networkStr) {
+        // "256MB / 129MB" -> [268435456L, 135266304L] (received / sent)
+        try {
+            String[] parts = networkStr.split(" / ");
+            return new long[]{
+                    parseBytes(parts[0].trim()),  // received
+                    parseBytes(parts[1].trim())   // sent
+            };
+        } catch (Exception e) {
+            return new long[]{0L, 0L};
+        }
+    }
+
+    private long[] parseDiskIO(String diskStr) {
+        // "0B / 0B" -> [0L, 0L] (read / write)
+        try {
+            String[] parts = diskStr.split(" / ");
+            return new long[]{
+                    parseBytes(parts[0].trim()),  // read
+                    parseBytes(parts[1].trim())   // write
+            };
+        } catch (Exception e) {
+            return new long[]{0L, 0L};
+        }
     }
 }

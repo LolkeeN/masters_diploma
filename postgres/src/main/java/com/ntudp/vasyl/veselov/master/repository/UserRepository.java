@@ -12,8 +12,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository extends JpaRepository<SqlUser,String> {
 
-    List<SqlUser> findAll();
-
     @Query(nativeQuery = true,
             value = "SELECT COUNT(*) FROM (" +
                     "SELECT uf.uzer_id FROM uzer_friends uf " +
