@@ -31,5 +31,20 @@ public interface UserRepository extends JpaRepository<SqlUser,String> {
         deleteAllFriendshipsByUserId(userId);
         deleteById(userId);
     }
+    @Modifying
+    @Query(nativeQuery = true,
+            value = "DELETE FROM uzer_friends;")
+    void deleteAllFromFriendships();
 
+    @Modifying
+    @Query(nativeQuery = true,
+            value = "DELETE FROM uzer;")
+    void deleteAllFromUsers();
+
+
+    @Transactional
+    default void deleteAll() {
+        deleteAllFromFriendships();
+        deleteAllFromUsers();
+    };
 }

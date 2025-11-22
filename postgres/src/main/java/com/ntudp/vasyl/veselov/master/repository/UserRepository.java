@@ -32,4 +32,11 @@ public interface UserRepository extends JpaRepository<SqlUser,String> {
         deleteById(userId);
     }
 
+
+    @Modifying
+    @Query(nativeQuery = true,
+            value = "DELETE FROM uzer_friends;"
+                    + "DELETE FROM uzer;")
+    void deleteAll();
+
 }

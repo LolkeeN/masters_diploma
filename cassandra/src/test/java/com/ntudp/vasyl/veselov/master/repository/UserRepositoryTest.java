@@ -55,32 +55,7 @@ class UserRepositoryTest {
                     )
                     .withSharedMemorySize(8_000_000_000L)
                     .withEnv("HEAP_NEWSIZE", "800m")              // New generation heap
-                    .withEnv("MAX_HEAP_SIZE", "8g")               // Максимальный heap
-                    .withEnv("JVM_OPTS",
-                            "-XX:+UseG1GC " +                         // G1 сборщик мусора
-                                    "-XX:G1RSetUpdatingPauseTimePercent=5 " +
-                                    "-XX:MaxGCPauseMillis=300 " +
-                                    "-XX:InitiatingHeapOccupancyPercent=70 " +
-                                    "-Dcassandra.available_processors=8 " +    // CPU cores
-                                    "-Dcassandra.config.loader=org.apache.cassandra.config.YamlConfigurationLoader"
-                    )
-                    .withEnv("CASSANDRA_CLUSTER_NAME", "test-cluster")
-                    .withEnv("CASSANDRA_NUM_TOKENS", "256")       // Virtual nodes
-                    .withEnv("CASSANDRA_CONCURRENT_READS", "32")   // Concurrent reads
-                    .withEnv("CASSANDRA_CONCURRENT_WRITES", "32")  // Concurrent writes
-                    .withEnv("CASSANDRA_CONCURRENT_COUNTER_WRITES", "32")
-                    .withEnv("CASSANDRA_MEMTABLE_ALLOCATION_TYPE", "heap_buffers")
-                    .withEnv("CASSANDRA_MEMTABLE_CLEANUP_THRESHOLD", "0.4")
-                    .withEnv("CASSANDRA_MEMTABLE_FLUSH_WRITERS", "2")
-                    .withEnv("CASSANDRA_CONCURRENT_COMPACTORS", "4")  // Compaction
-                    .withEnv("CASSANDRA_COMPACTION_THROUGHPUT_MB_PER_SEC", "256")
-                    .withEnv("CASSANDRA_KEY_CACHE_SIZE_IN_MB", "512")     // Key cache
-                    .withEnv("CASSANDRA_ROW_CACHE_SIZE_IN_MB", "256")     // Row cache
-                    .withEnv("CASSANDRA_COUNTER_CACHE_SIZE_IN_MB", "128") // Counter cache
-                    .withEnv("CASSANDRA_FILE_CACHE_SIZE_IN_MB", "1024")   // File cache
-                    .withEnv("CASSANDRA_DISK_OPTIMIZATION_STRATEGY", "ssd") // SSD optimization
-                    .withEnv("CASSANDRA_INTER_DC_TCP_NODELAY", "true")     // Network optimization
-                    .withEnv("CASSANDRA_STREAMING_KEEP_ALIVE_PERIOD", "300")
+                    .withEnv("MAX_HEAP_SIZE", "8g")
             ;
 
     @DynamicPropertySource
@@ -245,6 +220,7 @@ class UserRepositoryTest {
                 .collect(Collectors.toList());
         fifteenPercentUsers
                 .stream()
+                .filter(user -> user.getFriends() != null && !user.getFriends().isEmpty())
                 .flatMap(user -> user.getFriends().stream().map(FriendInfo::getId))
                 .forEach(idsToDelete::add);
         idsToDelete.forEach(userRepository::deleteById);

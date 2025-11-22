@@ -20,7 +20,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, exclude = "friends")
 @Entity(name = "uzer")
 @Data
 @Builder
@@ -31,14 +31,16 @@ public class SqlUser extends User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.REFRESH})
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.REFRESH})
     @JoinTable(indexes = {
             @Index(name = "idx_uzer_friends_uzer_id", columnList = "uzer_id"),
-            @Index(name = "idx_uzer_friends_friends_id", columnList = "friends_id")
+            @Index(name = "idx_uzer_friends_friends_id", columnList = "friends_id"),
+            @Index(name = "idx_uzer_friends_both", columnList = "friends_id, uzer_id"),
+            @Index(name = "idx_uzer_friends_both_reversed", columnList = "uzer_id, friends_id")
     })
     private Set<SqlUser> friends = new HashSet<>();
 
-    public SqlUser() {
-        super(new Random());
-    }
+        public SqlUser() {
+            super(new Random());
+        }
 }

@@ -53,24 +53,20 @@ class UserRepositoryTest {
                     .withUsername("test")
                     .withPassword("test")
                     .withSharedMemorySize(8_000_000_000L)
+                    .withEnv("MYSQL_INNODB_BUFFER_POOL_SIZE", "2G")
+                    .withEnv("MYSQL_INNODB_LOG_FILE_SIZE", "512M")
+                    .withEnv("MYSQL_INNODB_FLUSH_LOG_AT_TRX_COMMIT", "2")
+                    .withEnv("MYSQL_MAX_CONNECTIONS", "1000")
+                    .withEnv("MYSQL_INNODB_IO_CAPACITY", "2000")
+                    .withEnv("MYSQL_SORT_BUFFER_SIZE", "8M")
                     .withCommand("mysqld",
-                            "--innodb-buffer-pool-size=4G",           // Основной кеш
-                            "--innodb-log-file-size=1G",              // Размер логов
-                            "--innodb-log-buffer-size=256M",          // Буфер логов
-                            "--innodb-flush-log-at-trx-commit=2",     // Производительность
-                            "--innodb-flush-method=O_DIRECT",         // Прямой I/O
-                            "--innodb-io-capacity=2000",              // SSD IOPS
-                            "--innodb-io-capacity-max=4000",
-                            "--innodb-read-io-threads=8",             // Потоки чтения
-                            "--innodb-write-io-threads=8",            // Потоки записи
-                            "--max-connections=1000",                 // Соединения
-                            "--thread-cache-size=100",                // Кеш потоков
-                            "--query-cache-size=0",                   // Отключить (устарело)
-                            "--tmp-table-size=512M",                  // Временные таблицы
-                            "--max-heap-table-size=512M",
-                            "--sort-buffer-size=8M",                  // Сортировка
-                            "--read-buffer-size=2M",                  // Чтение
-                            "--join-buffer-size=8M"                   // Джойны
+                            "--innodb-buffer-pool-size=1G",
+                            "--innodb-flush-log-at-trx-commit=0",  // ОПАСНО для продакшена!
+                            "--sync-binlog=0",                     // ОПАСНО для продакшена!
+                            "--innodb-doublewrite=0",              // ОПАСНО для продакшена!
+                            "--innodb-log-file-size=256M",
+                            "--max-connections=1000",
+                            "--skip-name-resolve"                  // Быстрее подключения
                     )
             ;
 

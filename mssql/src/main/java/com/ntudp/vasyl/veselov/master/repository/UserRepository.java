@@ -25,7 +25,13 @@ public interface UserRepository extends JpaRepository<SqlUser, String> {
 
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM uzer_friends WHERE uzer_id = ?1 OR friends_id = ?1", nativeQuery = true)
+    @Query(nativeQuery = true, value = """
+    DELETE FROM uzer_friends 
+    WHERE uzer_id = ?1
+    
+    DELETE FROM uzer_friends  
+    WHERE friends_id = ?1
+    """)
     void deleteAllFriendshipsByUserId(String userId);
 
     @Transactional
@@ -43,4 +49,10 @@ public interface UserRepository extends JpaRepository<SqlUser, String> {
     )
     """, nativeQuery = true)
     List<SqlUser> findAllByIdsString(@Param("idsString") String idsString);
+
+    @Modifying
+    @Query(nativeQuery = true,
+    value = "DELETE FROM uzer_friends;"
+            + "DELETE FROM uzer;")
+    void deleteAll();
 }

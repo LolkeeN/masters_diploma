@@ -24,8 +24,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.TestPropertySources;
+import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.startupcheck.MinimumDurationRunningStartupCheckStrategy;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -54,16 +56,10 @@ class UserRepositoryTest {
             new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
                     .acceptLicense()
                     .withPassword("yourStrong(!)Password")
-                    .withSharedMemorySize(8_000_000_000L)// 4GB
-                    .withEnv("MSSQL_MEMORY_LIMIT_MB", "4096")     // Память
-                    .withEnv("MSSQL_MAX_WORKER_THREADS", "512")   // Потоки
-                    .withCommand("/opt/mssql/bin/sqlservr",
-                            "--memory=4G",                            // Память
-                            "--tempdb-file-count=4",                  // TempDB файлы
-                            "--tempdb-file-size=1G",                  // Размер TempDB
-                            "--max-degree-of-parallelism=8"           // Параллелизм
-                    )
-                    .withReuse(true);
+                    .withEnv("MSSQL_MEMORY_LIMIT_MB", "6144")  // Больше памяти
+                    .withSharedMemorySize(8_000_000_000L)  // 8GB shared memory
+                    .waitingFor(Wait.forLogMessage(".*SQL Server is now ready.*", 1))
+            ;
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {

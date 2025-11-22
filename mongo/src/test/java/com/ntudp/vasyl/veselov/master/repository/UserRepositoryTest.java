@@ -49,16 +49,6 @@ class UserRepositoryTest {
     private static final MongoDBContainer MONGO_CONTAINER =
             new MongoDBContainer("mongo:latest")
                     .withSharedMemorySize(8_000_000_000L)
-                    .withCommand("mongod",
-                            "--wiredTigerCacheSizeGB=4",              // WiredTiger кеш
-                            "--wiredTigerCollectionBlockCompressor=snappy", // Сжатие
-                            "--wiredTigerIndexPrefixCompression=true", // Сжатие индексов
-                            "--maxConns=1000",                        // Соединения
-                            "--syncdelay=60",                         // Синхронизация
-                            "--journal",                              // Журналирование
-                            "--directoryperdb",                       // Отдельные папки БД
-                            "--cpu"                                   // CPU профилирование
-                    )
             ;
 
     @DynamicPropertySource
