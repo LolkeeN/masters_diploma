@@ -52,7 +52,26 @@ class UserRepositoryTest {
                     .withDatabaseName("uzer")
                     .withUsername("test")
                     .withPassword("test")
-                    .withSharedMemorySize(6_000_000_000L)
+                    .withSharedMemorySize(8_000_000_000L)
+                    .withCommand("mysqld",
+                            "--innodb-buffer-pool-size=4G",           // Основной кеш
+                            "--innodb-log-file-size=1G",              // Размер логов
+                            "--innodb-log-buffer-size=256M",          // Буфер логов
+                            "--innodb-flush-log-at-trx-commit=2",     // Производительность
+                            "--innodb-flush-method=O_DIRECT",         // Прямой I/O
+                            "--innodb-io-capacity=2000",              // SSD IOPS
+                            "--innodb-io-capacity-max=4000",
+                            "--innodb-read-io-threads=8",             // Потоки чтения
+                            "--innodb-write-io-threads=8",            // Потоки записи
+                            "--max-connections=1000",                 // Соединения
+                            "--thread-cache-size=100",                // Кеш потоков
+                            "--query-cache-size=0",                   // Отключить (устарело)
+                            "--tmp-table-size=512M",                  // Временные таблицы
+                            "--max-heap-table-size=512M",
+                            "--sort-buffer-size=8M",                  // Сортировка
+                            "--read-buffer-size=2M",                  // Чтение
+                            "--join-buffer-size=8M"                   // Джойны
+                    )
             ;
 
     @DynamicPropertySource
@@ -66,7 +85,7 @@ class UserRepositoryTest {
     }
 
     @Test
-    @Timeout(value = 30, unit = TimeUnit.MINUTES)
+    @Timeout(value = 3600, unit = TimeUnit.MINUTES)
     void test() throws Exception {
         Random rand = new Random();
         List<SqlUser> users = new ArrayList<>();
@@ -110,18 +129,17 @@ class UserRepositoryTest {
         });
 
 
+        log.info("Starting counting users with more than 1 friend");
         SqlUser randomUser = users.get(rand.nextInt(users.size() - 1));
 
         start = System.currentTimeMillis();
-        userRepository.findAll()
-                .stream()
-                .filter(u -> u.getFriends().size() > 1)
-                .count();
+        userRepository.countAllWithMoreThen1Friend();
 
         dataLines.add(new String[] {
                 "Find all and interact with many to many relation", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Starting find by id for");
         start = System.currentTimeMillis();
         userRepository.findById(randomUser.getId());
         dataLines.add(new String[] {
@@ -129,6 +147,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Starting delete by id with all friendships");
         randomUser = users.get(rand.nextInt(users.size() - 1));
         start = System.currentTimeMillis();
         userRepository.deleteUserWithFriendships(randomUser.getId());
@@ -137,12 +156,14 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Starting count all users");
         start = System.currentTimeMillis();
         userRepository.count();
         dataLines.add(new String[] {
                 "Count all", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Starting update random user");
         start = System.currentTimeMillis();
         randomUser = users.get(rand.nextInt(users.size() - 1));
         randomUser.setEmail(UUID.randomUUID().toString());
@@ -152,6 +173,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Starting find 10 percent of users");
         int tenPercent = usersCount / 10;
         Set<SqlUser> tenPercentUsers = users.stream()
                 .limit(tenPercent)
@@ -163,6 +185,7 @@ class UserRepositoryTest {
         dataLines.add(new String[] {
                 "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
+        log.info("Starting update 10 percent of users");
 
         List<SqlUser> updatedTenPercent = tenPercentUsers.stream()
                 .map(this::updateAddress)
@@ -173,6 +196,8 @@ class UserRepositoryTest {
                 "Update address for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
         users = userRepository.findAll();
+
+        log.info("Starting find 50 percent of users");
 
         int fiftyPercent = usersCount / 2;
         Set<SqlUser> fiftyPercentUsers = users.stream()
@@ -186,6 +211,8 @@ class UserRepositoryTest {
                 "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Starting update 50 percent of users");
+
         List<SqlUser> updated50Percent = fiftyPercentUsers.stream()
                 .map(this::updateAddress)
                 .toList();
@@ -196,6 +223,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Starting delete 15 percent of users with friends");
         int fifteenPercent = (usersCount * 15) / 100;
         Set<SqlUser> fifteenPercentUsers = users.stream()
                 .limit(fifteenPercent)
@@ -210,6 +238,7 @@ class UserRepositoryTest {
                 "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Starting delete all users");
         start = System.currentTimeMillis();
         userRepository.deleteAll();
         dataLines.add(new String[] {

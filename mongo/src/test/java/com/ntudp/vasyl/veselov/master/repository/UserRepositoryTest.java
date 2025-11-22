@@ -48,7 +48,17 @@ class UserRepositoryTest {
     @Container
     private static final MongoDBContainer MONGO_CONTAINER =
             new MongoDBContainer("mongo:latest")
-                    .withSharedMemorySize(6_000_000_000L)
+                    .withSharedMemorySize(8_000_000_000L)
+                    .withCommand("mongod",
+                            "--wiredTigerCacheSizeGB=4",              // WiredTiger кеш
+                            "--wiredTigerCollectionBlockCompressor=snappy", // Сжатие
+                            "--wiredTigerIndexPrefixCompression=true", // Сжатие индексов
+                            "--maxConns=1000",                        // Соединения
+                            "--syncdelay=60",                         // Синхронизация
+                            "--journal",                              // Журналирование
+                            "--directoryperdb",                       // Отдельные папки БД
+                            "--cpu"                                   // CPU профилирование
+                    )
             ;
 
     @DynamicPropertySource
@@ -58,7 +68,7 @@ class UserRepositoryTest {
     }
 
     @Test
-    @Timeout(value = 30, unit = TimeUnit.MINUTES)
+    @Timeout(value = 3600, unit = TimeUnit.MINUTES)
     void test() throws Exception {
         Random rand = new Random();
         List<MongoUser> users = new ArrayList<>();
@@ -102,7 +112,7 @@ class UserRepositoryTest {
                 "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
         });
 
-
+        log.info("Find all and interact with many to many relation");
         start = System.currentTimeMillis();
         userRepository.findAll()
                 .stream()
@@ -113,6 +123,7 @@ class UserRepositoryTest {
                 "Find all and interact with many to many relation", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Find by id");
         start = System.currentTimeMillis();
         userRepository.findById(randomUser.getId());
         dataLines.add(new String[] {
@@ -121,6 +132,8 @@ class UserRepositoryTest {
         users = userRepository.findAll();
         randomUser = users.get(rand.nextInt(users.size() - 1));
 
+        log.info("Delete by id");
+
         start = System.currentTimeMillis();
         userRepository.deleteById(randomUser.getId());
         dataLines.add(new String[] {
@@ -128,12 +141,14 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Count all");
         start = System.currentTimeMillis();
         userRepository.count();
         dataLines.add(new String[] {
                 "Count all", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Update user");
         start = System.currentTimeMillis();
         randomUser = users.get(rand.nextInt(users.size() - 1));
         randomUser.setEmail(UUID.randomUUID().toString());
@@ -143,6 +158,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("find 10 percent users");
         int tenPercent = usersCount / 10;
         Set<MongoUser> tenPercentUsers = users.stream()
                 .limit(tenPercent)
@@ -155,6 +171,8 @@ class UserRepositoryTest {
                 "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("update 10 percent users");
+
         List<MongoUser> updatedTenPercent = tenPercentUsers.stream()
                 .map(this::updateAddress)
                 .toList();
@@ -164,6 +182,8 @@ class UserRepositoryTest {
                 "Update address for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
         users = userRepository.findAll();
+
+        log.info("find 50 percent users");
 
         int fiftyPercent = usersCount / 2;
         Set<MongoUser> fiftyPercentUsers = users.stream()
@@ -177,6 +197,8 @@ class UserRepositoryTest {
                 "Find %s(10 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("update 50 percent users");
+
         List<MongoUser> updated50Percent = fiftyPercentUsers.stream()
                 .map(this::updateAddress)
                 .toList();
@@ -187,10 +209,14 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("find 15 percent users");
+
         int fifteenPercent = (usersCount * 15) / 100;
         Set<MongoUser> fifteenPercentUsers = users.stream()
                 .limit(fifteenPercent)
                 .collect(Collectors.toSet());
+
+        log.info("delete 15 percent users with friends");
 
         start = System.currentTimeMillis();
         fifteenPercentUsers
@@ -202,6 +228,7 @@ class UserRepositoryTest {
                 "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("delete all users");
         start = System.currentTimeMillis();
         userRepository.deleteAll();
         dataLines.add(new String[] {

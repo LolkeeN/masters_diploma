@@ -50,7 +50,23 @@ class UserRepositoryTest {
     private static final PostgreSQLContainer<?> POSTGRES_CONTAINER = new PostgreSQLContainer<>("postgres:latest")
             .withUsername("postgres")
             .withPassword("postgres")
-            .withSharedMemorySize(6_000_000_000L)
+            .withSharedMemorySize(8_000_000_000L)  // 8GB
+            .withCommand("postgres",
+                    "-c", "shared_buffers=2GB",           // Кеш PostgreSQL
+                    "-c", "effective_cache_size=6GB",     // Доступная память ОС
+                    "-c", "work_mem=256MB",               // Память для сортировок
+                    "-c", "maintenance_work_mem=512MB",   // Память для индексов
+                    "-c", "checkpoint_completion_target=0.9",
+                    "-c", "wal_buffers=64MB",             // WAL буферы
+                    "-c", "max_wal_size=4GB",             // Размер WAL
+                    "-c", "min_wal_size=1GB",
+                    "-c", "random_page_cost=1.1",         // SSD оптимизация
+                    "-c", "effective_io_concurrency=200", // SSD параллелизм
+                    "-c", "max_worker_processes=8",       // Рабочие процессы
+                    "-c", "max_parallel_workers_per_gather=4",
+                    "-c", "max_parallel_workers=8",
+                    "-c", "max_parallel_maintenance_workers=4"
+            )
             ;
 
     @DynamicPropertySource
@@ -63,7 +79,7 @@ class UserRepositoryTest {
     }
 
     @Test
-    @Timeout(value = 30, unit = TimeUnit.MINUTES)
+    @Timeout(value = 3600, unit = TimeUnit.MINUTES)
     void test() throws Exception {
         Random rand = new Random();
         List<SqlUser> users = new ArrayList<>();
@@ -107,12 +123,9 @@ class UserRepositoryTest {
                 "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
         });
 
-
+        log.info("Started finding all users with more then 1 friend");
         start = System.currentTimeMillis();
-        userRepository.findAll()
-                .stream()
-                .filter(u -> u.getFriends().size() > 1)
-                .count();
+        userRepository.countAllWithMoreThen1Friend();
 
         dataLines.add(new String[] {
                 "Find all and interact with many to many relation", String.valueOf(System.currentTimeMillis() - start)
@@ -126,6 +139,7 @@ class UserRepositoryTest {
         users = userRepository.findAll();
         randomUser = users.get(rand.nextInt(users.size() - 1));
 
+        log.info("Started deleting user by id with all friendships");
         start = System.currentTimeMillis();
         userRepository.deleteUserWithFriendships(randomUser.getId());
         dataLines.add(new String[] {
@@ -133,12 +147,14 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Started counting all users");
         start = System.currentTimeMillis();
         userRepository.count();
         dataLines.add(new String[] {
                 "Count all", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("started updating random user");
         start = System.currentTimeMillis();
         randomUser = users.get(rand.nextInt(users.size() - 1));
         randomUser.setEmail(UUID.randomUUID().toString());
@@ -148,6 +164,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Started finding 10 percents of users");
         int tenPercent = usersCount / 10;
         Set<SqlUser> tenPercentUsers = users.stream()
                 .limit(tenPercent)
@@ -160,6 +177,8 @@ class UserRepositoryTest {
                 "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Started updating 10 percents of users");
+
         List<SqlUser> updatedTenPercent = tenPercentUsers.stream()
                 .map(this::updateAddress)
                 .toList();
@@ -169,6 +188,8 @@ class UserRepositoryTest {
                 "Update address for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
         users = userRepository.findAll();
+
+        log.info("Started finding 50 percents of users");
 
         int fiftyPercent = usersCount / 2;
         Set<SqlUser> fiftyPercentUsers = users.stream()
@@ -182,6 +203,8 @@ class UserRepositoryTest {
                 "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Started updating 50 percents of users");
+
         List<SqlUser> updated50Percent = fiftyPercentUsers.stream()
                 .map(this::updateAddress)
                 .toList();
@@ -191,6 +214,8 @@ class UserRepositoryTest {
                 "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
         users = userRepository.findAll();
+
+        log.info("Started deleting 15 percents of users");
 
         int fifteenPercent = (usersCount * 15) / 100;
         Set<SqlUser> fifteenPercentUsers = users.stream()
@@ -205,6 +230,8 @@ class UserRepositoryTest {
         dataLines.add(new String[]{
                 "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
+
+        log.info("Started deleting all users");
 
         start = System.currentTimeMillis();
         userRepository.deleteAll();

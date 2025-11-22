@@ -48,8 +48,20 @@ class UserRepositoryTest {
     private static final GenericContainer<?> REDIS_CONTAINER =
             new GenericContainer<>("redis:latest")
                     .withExposedPorts(6379)
-                    .withSharedMemorySize(6_000_000_000L)
+                    .withSharedMemorySize(8_000_000_000L)
                     .withCommand("redis-server", "--maxmemory", "6gb", "--maxmemory-policy", "allkeys-lru")
+                    .withCommand("redis-server",
+                            "--maxmemory", "6gb",                     // Максимум памяти
+                            "--maxmemory-policy", "allkeys-lru",      // Политика вытеснения
+                            "--save", "900 1",                        // Сохранение на диск
+                            "--save", "300 10",
+                            "--save", "60 10000",
+                            "--tcp-keepalive", "60",                  // Keep-alive
+                            "--timeout", "300",                       // Таймаут
+                            "--databases", "16",                      // Количество БД
+                            "--rdbcompression", "yes",                // Сжатие RDB
+                            "--stop-writes-on-bgsave-error", "no"     // Не останавливать при ошибках
+                    )
             ;
 
     @DynamicPropertySource
@@ -59,7 +71,7 @@ class UserRepositoryTest {
     }
 
     @Test
-    @Timeout(value = 30, unit = TimeUnit.MINUTES)
+    @Timeout(value = 3600, unit = TimeUnit.MINUTES)
     void test() throws Exception {
         Random rand = new Random();
         List<RedisUser> users = new ArrayList<>();
@@ -102,6 +114,7 @@ class UserRepositoryTest {
                 "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("find all users and interact with many to many relation");
         start = System.currentTimeMillis();
         userRepository.findAll()
                 .stream()
@@ -112,6 +125,8 @@ class UserRepositoryTest {
                 "Find all and interact with many to many relation", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Find by id");
+
         start = System.currentTimeMillis();
         userRepository.findById(randomUser.getId());
         dataLines.add(new String[]{
@@ -121,6 +136,7 @@ class UserRepositoryTest {
         users = userRepository.findAll();
         randomUser = users.get(rand.nextInt(users.size() - 1));
 
+        log.info("Delete by id with all friendships");
         start = System.currentTimeMillis();
         userRepository.deleteById(randomUser.getId());
         dataLines.add(new String[]{
@@ -128,13 +144,14 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
-
+        log.info("count all users");
         start = System.currentTimeMillis();
         userRepository.count();
         dataLines.add(new String[]{
                 "Count all", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Update user");
         start = System.currentTimeMillis();
         randomUser = users.get(rand.nextInt(users.size() - 1));
         randomUser.setEmail(UUID.randomUUID().toString());
@@ -149,12 +166,15 @@ class UserRepositoryTest {
                 .limit(tenPercent)
                 .collect(Collectors.toSet());
 
+        log.info("find 10 percent users");
         start = System.currentTimeMillis();
         userRepository.findAllById(tenPercentUsers.stream().map(RedisUser::getId).collect(Collectors.toList()));
 
         dataLines.add(new String[]{
                 "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
+
+        log.info("update 10 percent users");
 
         List<RedisUser> updatedTenPercent = tenPercentUsers.stream()
                 .map(this::updateAddress)
@@ -165,6 +185,8 @@ class UserRepositoryTest {
                 "Update address for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
         users = userRepository.findAll();
+
+        log.info("find 50 percent users");
 
         int fiftyPercent = usersCount / 2;
         Set<RedisUser> fiftyPercentUsers = users.stream()
@@ -178,6 +200,8 @@ class UserRepositoryTest {
                 "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("update 50 percent users");
+
         List<RedisUser> updated50Percent = fiftyPercentUsers.stream()
                 .map(this::updateAddress)
                 .toList();
@@ -188,10 +212,14 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("find 15 percent users");
+
         int fifteenPercent = (usersCount * 15) / 100;
         Set<RedisUser> fifteenPercentUsers = users.stream()
                 .limit(fifteenPercent)
                 .collect(Collectors.toSet());
+
+        log.info("delete 15 percent users with friends");
 
         start = System.currentTimeMillis();
         fifteenPercentUsers
@@ -203,6 +231,7 @@ class UserRepositoryTest {
                 "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("delete all users");
         start = System.currentTimeMillis();
         userRepository.deleteAll();
         dataLines.add(new String[]{

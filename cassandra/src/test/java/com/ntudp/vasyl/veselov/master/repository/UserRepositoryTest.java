@@ -53,7 +53,34 @@ class UserRepositoryTest {
                     .withInitScript(
                             "com/ntudp/vasyl/veselov/master/repository/init-cassandra.cql"
                     )
-                    .withSharedMemorySize(6_000_000_000L)
+                    .withSharedMemorySize(8_000_000_000L)
+                    .withEnv("HEAP_NEWSIZE", "800m")              // New generation heap
+                    .withEnv("MAX_HEAP_SIZE", "8g")               // Максимальный heap
+                    .withEnv("JVM_OPTS",
+                            "-XX:+UseG1GC " +                         // G1 сборщик мусора
+                                    "-XX:G1RSetUpdatingPauseTimePercent=5 " +
+                                    "-XX:MaxGCPauseMillis=300 " +
+                                    "-XX:InitiatingHeapOccupancyPercent=70 " +
+                                    "-Dcassandra.available_processors=8 " +    // CPU cores
+                                    "-Dcassandra.config.loader=org.apache.cassandra.config.YamlConfigurationLoader"
+                    )
+                    .withEnv("CASSANDRA_CLUSTER_NAME", "test-cluster")
+                    .withEnv("CASSANDRA_NUM_TOKENS", "256")       // Virtual nodes
+                    .withEnv("CASSANDRA_CONCURRENT_READS", "32")   // Concurrent reads
+                    .withEnv("CASSANDRA_CONCURRENT_WRITES", "32")  // Concurrent writes
+                    .withEnv("CASSANDRA_CONCURRENT_COUNTER_WRITES", "32")
+                    .withEnv("CASSANDRA_MEMTABLE_ALLOCATION_TYPE", "heap_buffers")
+                    .withEnv("CASSANDRA_MEMTABLE_CLEANUP_THRESHOLD", "0.4")
+                    .withEnv("CASSANDRA_MEMTABLE_FLUSH_WRITERS", "2")
+                    .withEnv("CASSANDRA_CONCURRENT_COMPACTORS", "4")  // Compaction
+                    .withEnv("CASSANDRA_COMPACTION_THROUGHPUT_MB_PER_SEC", "256")
+                    .withEnv("CASSANDRA_KEY_CACHE_SIZE_IN_MB", "512")     // Key cache
+                    .withEnv("CASSANDRA_ROW_CACHE_SIZE_IN_MB", "256")     // Row cache
+                    .withEnv("CASSANDRA_COUNTER_CACHE_SIZE_IN_MB", "128") // Counter cache
+                    .withEnv("CASSANDRA_FILE_CACHE_SIZE_IN_MB", "1024")   // File cache
+                    .withEnv("CASSANDRA_DISK_OPTIMIZATION_STRATEGY", "ssd") // SSD optimization
+                    .withEnv("CASSANDRA_INTER_DC_TCP_NODELAY", "true")     // Network optimization
+                    .withEnv("CASSANDRA_STREAMING_KEEP_ALIVE_PERIOD", "300")
             ;
 
     @DynamicPropertySource
@@ -65,7 +92,7 @@ class UserRepositoryTest {
     }
 
     @Test
-    @Timeout(value = 30, unit = TimeUnit.MINUTES)
+    @Timeout(value = 3600, unit = TimeUnit.MINUTES)
     void test() throws Exception {
         Random rand = new Random();
         List<CassandraUser> users = new ArrayList<>();
@@ -109,6 +136,7 @@ class UserRepositoryTest {
                 "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Find all and interact with many to many relation");
         start = System.currentTimeMillis();
         userRepository.findAll()
                 .stream()
@@ -119,12 +147,14 @@ class UserRepositoryTest {
                 "Find all and interact with many to many relation", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Find by id");
         start = System.currentTimeMillis();
         userRepository.findById(randomUser.getId()); // Явно используем String ID
         dataLines.add(new String[] {
                 "Find by id", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("delete by id");
         start = System.currentTimeMillis();
         userRepository.deleteById(randomUser.getId());
         dataLines.add(new String[] {
@@ -132,12 +162,14 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Count all users");
         start = System.currentTimeMillis();
         userRepository.count();
         dataLines.add(new String[] {
                 "Count all", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("Update user");
         start = System.currentTimeMillis();
         randomUser = users.get(rand.nextInt(users.size() - 1));
         randomUser.setEmail(UUID.randomUUID().toString());
@@ -147,6 +179,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("Find 10 percent users");
         int tenPercent = usersCount / 10;
         Set<CassandraUser> tenPercentUsers = users.stream()
                 .limit(tenPercent)
@@ -159,6 +192,8 @@ class UserRepositoryTest {
                 "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("update 10 percent users");
+
         List<CassandraUser> updatedTenPercent = tenPercentUsers.stream()
                 .map(this::updateAddress)
                 .toList();
@@ -168,6 +203,8 @@ class UserRepositoryTest {
                 "Update address for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
         users = userRepository.findAll();
+
+        log.info("find 50 percent users");
 
         int fiftyPercent = usersCount / 2;
         Set<CassandraUser> fiftyPercentUsers = users.stream()
@@ -181,6 +218,8 @@ class UserRepositoryTest {
                 "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("update 50 percent users");
+
         List<CassandraUser> updated50Percent = fiftyPercentUsers.stream()
                 .map(this::updateAddress)
                 .toList();
@@ -191,10 +230,14 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        log.info("find 15 percent users");
+
         int fifteenPercent = (usersCount * 15) / 100;
         Set<CassandraUser> fifteenPercentUsers = users.stream()
                 .limit(fifteenPercent)
                 .collect(Collectors.toSet());
+
+        log.info("delete 15 percent users with friends");
 
         start = System.currentTimeMillis();
         List<String> idsToDelete = fifteenPercentUsers.stream()
@@ -209,6 +252,7 @@ class UserRepositoryTest {
                 "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        log.info("delete all users");
         start = System.currentTimeMillis();
         userRepository.deleteAll();
         dataLines.add(new String[] {

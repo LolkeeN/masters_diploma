@@ -14,6 +14,13 @@ public interface UserRepository extends JpaRepository<SqlUser,String> {
 
     List<SqlUser> findAll();
 
+    @Query(nativeQuery = true,
+            value = "SELECT COUNT(*) FROM (" +
+                    "SELECT uf.uzer_id FROM uzer_friends uf " +
+                    "GROUP BY uf.uzer_id HAVING COUNT(*) > 1" +
+                    ") subquery")
+    Long countAllWithMoreThen1Friend();
+
     @Modifying
     @Transactional
     @Query(value = "DELETE FROM uzer_friends WHERE uzer_id = ?1 OR friends_id = ?1", nativeQuery = true)

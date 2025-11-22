@@ -6,7 +6,10 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -29,6 +32,10 @@ public class SqlUser extends User {
     private String id;
 
     @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.REFRESH})
+    @JoinTable(indexes = {
+            @Index(name = "idx_uzer_friends_uzer_id", columnList = "uzer_id"),
+            @Index(name = "idx_uzer_friends_friends_id", columnList = "friends_id")
+    })
     private Set<SqlUser> friends = new HashSet<>();
 
     public SqlUser() {
