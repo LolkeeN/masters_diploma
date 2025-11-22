@@ -49,6 +49,8 @@ class UserRepositoryTest {
     @Value("${test.users.count}")
     private int usersCount;
 
+    private String stageName;
+
     @Container
     private static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>("postgres:latest")
@@ -84,6 +86,7 @@ class UserRepositoryTest {
                 "Operation", "Time (ms)"
         });
 
+        stageName = "user generation";
         long start = System.currentTimeMillis();
         List<SqlUser> finalUsers = users;
         Executors.newFixedThreadPool(15).execute(() -> {
@@ -127,6 +130,7 @@ class UserRepositoryTest {
                 "Generate starting users", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        stageName = "count all with more than 1 friend";
         log.info("Started finding all users with more then 1 friend");
         start = System.currentTimeMillis();
         userRepository.countAllWithMoreThen1Friend();
@@ -135,6 +139,7 @@ class UserRepositoryTest {
                 "Find all and interact with many to many relation", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        stageName = "find 1 by id";
         start = System.currentTimeMillis();
         userRepository.findById(randomUser.getId());
         dataLines.add(new String[] {
@@ -144,6 +149,7 @@ class UserRepositoryTest {
         users = userRepository.findAll();
         randomUser = users.get(rand.nextInt(users.size() - 1));
 
+        stageName = "delete 1 by id with friendships";
         log.info("Started deleting user by id with all friendships");
         start = System.currentTimeMillis();
         userRepository.deleteUserWithFriendships(randomUser.getId());
@@ -152,6 +158,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        stageName = "count all";
         log.info("Started counting all users");
         start = System.currentTimeMillis();
         userRepository.count();
@@ -159,6 +166,7 @@ class UserRepositoryTest {
                 "Count all", String.valueOf(System.currentTimeMillis() - start)
         });
 
+        stageName = "update 1 random";
         log.info("started updating random user");
         start = System.currentTimeMillis();
         randomUser = users.get(rand.nextInt(users.size() - 1));
@@ -169,6 +177,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        stageName = "find 10 percent";
         log.info("Started finding 10 percents of users");
         int tenPercent = usersCount / 10;
         Set<SqlUser> tenPercentUsers = users.stream()
@@ -182,6 +191,7 @@ class UserRepositoryTest {
                 "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        stageName = "update 10 percent";
         log.info("Started updating 10 percents of users");
 
         List<SqlUser> updatedTenPercent = tenPercentUsers.stream()
@@ -194,6 +204,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        stageName = "find 50 percent";
         log.info("Started finding 50 percents of users");
 
         int fiftyPercent = usersCount / 2;
@@ -208,6 +219,7 @@ class UserRepositoryTest {
                 "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
+        stageName = "update 50 percent";
         log.info("Started updating 50 percents of users");
 
         List<SqlUser> updated50Percent = fiftyPercentUsers.stream()
@@ -220,6 +232,7 @@ class UserRepositoryTest {
         });
         users = userRepository.findAll();
 
+        stageName = "find 15 percent";
         log.info("Started deleting 15 percents of users");
 
         int fifteenPercent = (usersCount * 15) / 100;
@@ -227,6 +240,7 @@ class UserRepositoryTest {
                 .limit(fifteenPercent)
                 .collect(Collectors.toSet());
 
+        stageName = "delete 15 percent with friends";
         start = System.currentTimeMillis();
         fifteenPercentUsers
                 .stream()
@@ -238,6 +252,7 @@ class UserRepositoryTest {
 
         log.info("Started deleting all users");
 
+        stageName = "delete all";
         start = System.currentTimeMillis();
         userRepository.deleteAll();
         dataLines.add(new String[] {
@@ -248,6 +263,7 @@ class UserRepositoryTest {
 
         List<String[]> metricDataLines = new ArrayList<>();
         metricDataLines.add(new String[]{
+                "Stage name",
                 "Timestamp",
                 "CPU percentage",
                 "Memory Usage bytes",
@@ -259,6 +275,7 @@ class UserRepositoryTest {
         });
         for (ContainerStats metric : metrics) {
             metricDataLines.add(new String[]{
+                    metric.getStageName(),
                     String.valueOf(metric.getTimestamp()),
                     String.valueOf(metric.getCpuPercentage()),
                     String.valueOf(metric.getMemoryUsageBytes()),
@@ -321,7 +338,7 @@ class UserRepositoryTest {
             log.warn("Failed to collect stats via docker command: {}", e.getMessage());
         }
 
-        return new ContainerStats(0, 0, 0, 0, 0, 0, 0, System.currentTimeMillis());
+        return new ContainerStats(stageName, 0, 0, 0, 0, 0, 0, 0, System.currentTimeMillis());
     }
 
     private ContainerStats parseDockerStatsOutput(String line) {
@@ -334,6 +351,7 @@ class UserRepositoryTest {
         long[] disk = parseDiskIO(parts[3]);                    // "0B / 0B" -> [read, write]
 
         return new ContainerStats(
+                stageName,
                 cpuPercent,
                 memory[0],      // usage
                 memory[1],      // limit

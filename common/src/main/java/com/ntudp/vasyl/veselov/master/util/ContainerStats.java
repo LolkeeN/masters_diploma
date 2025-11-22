@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ContainerStats {
 
+    private final String stageName;
     private final double cpuPercentage;          // 100.85
     private final long memoryUsageBytes;        // 1.15GB в байтах
     private final long memoryLimitBytes;        // 15.44GB в байтах
