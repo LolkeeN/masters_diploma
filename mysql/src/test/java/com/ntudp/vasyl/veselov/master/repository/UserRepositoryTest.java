@@ -45,7 +45,6 @@ class UserRepositoryTest {
     @Value("${test.users.count}")
     private int usersCount;
 
-    @ServiceConnection
     @Container
     private static final MySQLContainer<?> MYSQL_CONTAINER =
             new MySQLContainer<>("mysql:8.1.0")
@@ -53,22 +52,15 @@ class UserRepositoryTest {
                     .withUsername("test")
                     .withPassword("test")
                     .withSharedMemorySize(8_000_000_000L)
-                    .withEnv("MYSQL_INNODB_BUFFER_POOL_SIZE", "2G")
-                    .withEnv("MYSQL_INNODB_LOG_FILE_SIZE", "512M")
-                    .withEnv("MYSQL_INNODB_FLUSH_LOG_AT_TRX_COMMIT", "2")
-                    .withEnv("MYSQL_MAX_CONNECTIONS", "1000")
-                    .withEnv("MYSQL_INNODB_IO_CAPACITY", "2000")
-                    .withEnv("MYSQL_SORT_BUFFER_SIZE", "8M")
                     .withCommand("mysqld",
-                            "--innodb-buffer-pool-size=1G",
-                            "--innodb-flush-log-at-trx-commit=0",  // ОПАСНО для продакшена!
-                            "--sync-binlog=0",                     // ОПАСНО для продакшена!
-                            "--innodb-doublewrite=0",              // ОПАСНО для продакшена!
-                            "--innodb-log-file-size=256M",
+                            "--innodb-buffer-pool-size=2G",          // ← Убрать конфликт
+                            "--innodb-flush-log-at-trx-commit=0",    // Отключить персистентность
+                            "--sync-binlog=0",                       // Отключить персистентность
+                            "--innodb-doublewrite=0",                // Отключить персистентность
+                            "--innodb-log-file-size=512M",
                             "--max-connections=1000",
-                            "--skip-name-resolve"                  // Быстрее подключения
-                    )
-            ;
+                            "--skip-name-resolve"
+                    );
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {

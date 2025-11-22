@@ -2,6 +2,10 @@ package com.ntudp.vasyl.veselov.master.repository;
 
 import com.ntudp.vasyl.veselov.master.dto.SqlUser;
 import com.ntudp.vasyl.veselov.master.util.CsvUtil;
+import jakarta.annotation.PostConstruct;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -13,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -46,20 +51,32 @@ class UserRepositoryTest {
     private final Object monitor = new Object();
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private DataSource dataSource;
 
     @Value("${test.users.count}")
     private int usersCount;
 
-    @ServiceConnection
     @Container
     private static final MSSQLServerContainer<?> MS_SQL_CONTAINER =
             new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2022-latest")
                     .acceptLicense()
                     .withPassword("yourStrong(!)Password")
-                    .withEnv("MSSQL_MEMORY_LIMIT_MB", "6144")  // Больше памяти
-                    .withSharedMemorySize(8_000_000_000L)  // 8GB shared memory
-                    .waitingFor(Wait.forLogMessage(".*SQL Server is now ready.*", 1))
-            ;
+                    .withEnv("MSSQL_MEMORY_LIMIT_MB", "6144")
+                    .withSharedMemorySize(8_000_000_000L)
+                    .waitingFor(Wait.forLogMessage(".*SQL Server is now ready.*", 1));
+
+    // + добавить @PostConstruct для T-SQL настроек:
+    @PostConstruct
+    public void configureMSSQL() throws SQLException {
+        try (Connection conn = dataSource.getConnection();
+                Statement stmt = conn.createStatement()) {
+
+            stmt.execute("ALTER DATABASE CURRENT SET RECOVERY SIMPLE");         // Отключить персистентность
+            stmt.execute("EXEC sp_configure 'max server memory (MB)', 6144");   // Лимит памяти
+            stmt.execute("RECONFIGURE");
+        }
+    }
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {

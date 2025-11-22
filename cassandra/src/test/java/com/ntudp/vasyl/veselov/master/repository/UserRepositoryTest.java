@@ -54,8 +54,8 @@ class UserRepositoryTest {
                             "com/ntudp/vasyl/veselov/master/repository/init-cassandra.cql"
                     )
                     .withSharedMemorySize(8_000_000_000L)
-                    .withEnv("HEAP_NEWSIZE", "800m")              // New generation heap
-                    .withEnv("MAX_HEAP_SIZE", "8g")
+                    .withEnv("HEAP_NEWSIZE", "500m")
+                    .withEnv("MAX_HEAP_SIZE", "2g")
             ;
 
     @DynamicPropertySource

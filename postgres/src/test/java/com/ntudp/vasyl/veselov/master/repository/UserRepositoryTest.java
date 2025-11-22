@@ -45,29 +45,20 @@ class UserRepositoryTest {
     @Value("${test.users.count}")
     private int usersCount;
 
-    @ServiceConnection
     @Container
-    private static final PostgreSQLContainer<?> POSTGRES_CONTAINER = new PostgreSQLContainer<>("postgres:latest")
-            .withUsername("postgres")
-            .withPassword("postgres")
-            .withSharedMemorySize(8_000_000_000L)  // 8GB
-            .withCommand("postgres",
-                    "-c", "shared_buffers=2GB",           // Кеш PostgreSQL
-                    "-c", "effective_cache_size=6GB",     // Доступная память ОС
-                    "-c", "work_mem=256MB",               // Память для сортировок
-                    "-c", "maintenance_work_mem=512MB",   // Память для индексов
-                    "-c", "checkpoint_completion_target=0.9",
-                    "-c", "wal_buffers=64MB",             // WAL буферы
-                    "-c", "max_wal_size=4GB",             // Размер WAL
-                    "-c", "min_wal_size=1GB",
-                    "-c", "random_page_cost=1.1",         // SSD оптимизация
-                    "-c", "effective_io_concurrency=200", // SSD параллелизм
-                    "-c", "max_worker_processes=8",       // Рабочие процессы
-                    "-c", "max_parallel_workers_per_gather=4",
-                    "-c", "max_parallel_workers=8",
-                    "-c", "max_parallel_maintenance_workers=4"
-            )
-            ;
+    private static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
+            new PostgreSQLContainer<>("postgres:latest")
+                    .withUsername("postgres")
+                    .withPassword("postgres")
+                    .withSharedMemorySize(8_000_000_000L)
+                    .withCommand("postgres",
+                            "-c", "shared_buffers=2GB",        // Основной кеш
+                            "-c", "effective_cache_size=6GB",  // Доступная память
+                            "-c", "work_mem=128MB",            // Упростить
+                            "-c", "fsync=off",                 // Отключить для честности
+                            "-c", "synchronous_commit=off",    // Отключить для честности
+                            "-c", "checkpoint_segments=32"     // Упростить
+                    );
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {

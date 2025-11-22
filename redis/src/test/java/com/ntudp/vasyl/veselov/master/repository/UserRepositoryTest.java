@@ -49,18 +49,14 @@ class UserRepositoryTest {
             new GenericContainer<>("redis:latest")
                     .withExposedPorts(6379)
                     .withSharedMemorySize(8_000_000_000L)
-                    .withCommand("redis-server", "--maxmemory", "6gb", "--maxmemory-policy", "allkeys-lru")
                     .withCommand("redis-server",
-                            "--maxmemory", "6gb",                     // Максимум памяти
-                            "--maxmemory-policy", "allkeys-lru",      // Политика вытеснения
-                            "--save", "900 1",                        // Сохранение на диск
-                            "--save", "300 10",
-                            "--save", "60 10000",
-                            "--tcp-keepalive", "60",                  // Keep-alive
-                            "--timeout", "300",                       // Таймаут
-                            "--databases", "16",                      // Количество БД
-                            "--rdbcompression", "yes",                // Сжатие RDB
-                            "--stop-writes-on-bgsave-error", "no"     // Не останавливать при ошибках
+                            "--maxmemory", "6gb",
+                            "--maxmemory-policy", "noeviction",  // ← НЕ удаляем данные!
+                            "--save", "",                        // ← Отключаем сохранение на диск!
+                            "--appendonly", "no",                // ← Отключаем AOF
+                            "--databases", "1",                  // ← Только 1 БД
+                            "--tcp-keepalive", "0",              // ← Отключаем keepalive
+                            "--timeout", "0"                     // ← Без таймаутов
                     )
             ;
 

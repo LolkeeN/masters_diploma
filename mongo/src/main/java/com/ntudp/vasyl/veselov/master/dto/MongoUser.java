@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.MongoId;
@@ -19,7 +20,7 @@ public class MongoUser extends User {
     private String id = UUID.randomUUID().toString();
 
     @Field("friends")
-    private Set<MongoUser> friends = new HashSet<>();
+    private Set<UserFriendship> friends = new HashSet<>();
 
     public MongoUser() {
         super(new Random());

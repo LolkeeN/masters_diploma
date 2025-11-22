@@ -1,7 +1,9 @@
 package com.ntudp.vasyl.veselov.master.repository;
 
 import com.ntudp.vasyl.veselov.master.dto.MongoUser;
+import com.ntudp.vasyl.veselov.master.dto.UserFriendship;
 import com.ntudp.vasyl.veselov.master.util.CsvUtil;
+import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -19,6 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -40,16 +45,40 @@ class UserRepositoryTest {
     private final Object monitor = new Object();
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private UserFriendshipRepository userFriendshipRepository;
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
     @Value("${test.users.count}")
     private int usersCount;
 
-    @ServiceConnection
     @Container
     private static final MongoDBContainer MONGO_CONTAINER =
             new MongoDBContainer("mongo:latest")
-                    .withSharedMemorySize(8_000_000_000L)
-            ;
+                    .withSharedMemorySize(8_000_000_000L);
+
+
+    @PostConstruct
+    public void createIndexes() throws Exception {
+        // Индекс на ID (если не String _id)
+        mongoTemplate.indexOps(MongoUser.class)
+                .ensureIndex(new Index("id", Sort.Direction.ASC));
+
+        // Индексы для поиска друзей
+        mongoTemplate.indexOps("user_friends")  // коллекция связей
+                .ensureIndex(new Index("userId", Sort.Direction.ASC));
+
+        mongoTemplate.indexOps("user_friends")
+                .ensureIndex(new Index("friendId", Sort.Direction.ASC));
+
+        // Составной индекс для связей
+        mongoTemplate.indexOps("user_friends")
+                .ensureIndex(new Index()
+                        .on("userId", Sort.Direction.ASC)
+                        .on("friendId", Sort.Direction.ASC));
+    }
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
@@ -86,7 +115,8 @@ class UserRepositoryTest {
 
 
                 if (finalUsers.size() > 2) {
-                    user.getFriends().add(finalUsers.get(rand.nextInt(finalUsers.size() - 1)));
+                    UserFriendship friendship = new UserFriendship(user.getId(), finalUsers.get(rand.nextInt(finalUsers.size() - 1)).getId());
+                    user.getFriends().add(userFriendshipRepository.save(friendship));
                 }
 
                 finalUsers.add(userRepository.save(user));
@@ -211,15 +241,20 @@ class UserRepositoryTest {
         start = System.currentTimeMillis();
         fifteenPercentUsers
                 .stream()
-                .flatMap(user -> user.getFriends().stream())
-                .map(MongoUser::getId)
-                .forEach(userRepository::deleteById);
+                .forEach(user -> {
+                    // Удаляем связи
+                    userFriendshipRepository.deleteById(user.getId());
+                    userFriendshipRepository.deleteAllByFriendId(user.getId());
+                    // Удаляем пользователя
+                    userRepository.deleteById(user.getId());
+                });
         dataLines.add(new String[]{
                 "Delete users with friends for %s(15 percent) random users".formatted(fifteenPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
 
         log.info("delete all users");
         start = System.currentTimeMillis();
+        userFriendshipRepository.deleteAll();
         userRepository.deleteAll();
         dataLines.add(new String[] {
                 "Delete all users", String.valueOf(System.currentTimeMillis() - start)
