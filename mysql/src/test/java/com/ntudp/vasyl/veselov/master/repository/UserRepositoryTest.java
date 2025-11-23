@@ -51,6 +51,9 @@ class UserRepositoryTest {
     @Value("${test.users.count}")
     private int usersCount;
 
+    @Value("${sql.batch.size}")
+    private int batchSize;
+
     @Container
     private static final MySQLContainer<?> MYSQL_CONTAINER =
             new MySQLContainer<>("mysql:8.1.0")
@@ -187,12 +190,15 @@ class UserRepositoryTest {
         stageName = "find 10 percent";
         log.info("Starting find 10 percent of users");
         int tenPercent = usersCount / 10;
-        Set<SqlUser> tenPercentUsers = users.stream()
+        List<SqlUser> tenPercentUsers = users.stream()
                 .limit(tenPercent)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toList());
 
         start = System.currentTimeMillis();
-        userRepository.findAllById(tenPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
+        for (int i = 0; i < tenPercentUsers.size(); i += batchSize) {
+            List<SqlUser> sublist = tenPercentUsers.subList(i, Math.min(i + batchSize, tenPercentUsers.size()));
+            userRepository.findAllById(sublist.stream().map(SqlUser::getId).collect(Collectors.toList()));
+        }
 
         dataLines.add(new String[] {
                 "Find %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
@@ -205,7 +211,10 @@ class UserRepositoryTest {
                 .map(this::updateAddress)
                 .toList();
         start = System.currentTimeMillis();
-        userRepository.saveAll(updatedTenPercent);
+        for (int i = 0; i < updatedTenPercent.size(); i += batchSize) {
+            List<SqlUser> sublist = updatedTenPercent.subList(i, Math.min(i + batchSize, updatedTenPercent.size()));
+            userRepository.saveAll(sublist);
+        }
         dataLines.add(new String[] {
                 "Update address for %s(10 percent) random users".formatted(tenPercent), String.valueOf(System.currentTimeMillis() - start)
         });
@@ -215,12 +224,15 @@ class UserRepositoryTest {
         log.info("Starting find 50 percent of users");
 
         int fiftyPercent = usersCount / 2;
-        Set<SqlUser> fiftyPercentUsers = users.stream()
+        List<SqlUser> fiftyPercentUsers = users.stream()
                 .limit(fiftyPercent)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toList());
 
         start = System.currentTimeMillis();
-        userRepository.findAllById(fiftyPercentUsers.stream().map(SqlUser::getId).collect(Collectors.toList()));
+        for (int i = 0; i < fiftyPercentUsers.size(); i += batchSize) {
+            List<SqlUser> sublist = fiftyPercentUsers.subList(i, Math.min(i + batchSize, fiftyPercentUsers.size()));
+            userRepository.findAllById(sublist.stream().map(SqlUser::getId).collect(Collectors.toList()));
+        }
 
         dataLines.add(new String[] {
                 "Find %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
@@ -234,7 +246,10 @@ class UserRepositoryTest {
                 .toList();
 
         start = System.currentTimeMillis();
-        userRepository.saveAll(updated50Percent);
+        for (int i = 0; i < updated50Percent.size(); i += batchSize) {
+            List<SqlUser> sublist = updated50Percent.subList(i, Math.min(i + batchSize, updated50Percent.size()));
+            userRepository.saveAll(sublist);
+        }
         dataLines.add(new String[] {
                 "Update address for %s(50 percent) random users".formatted(fiftyPercentUsers.size()), String.valueOf(System.currentTimeMillis() - start)
         });
